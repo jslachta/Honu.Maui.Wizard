@@ -1,0 +1,59 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.8.12023.21
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Honu.Maui.Wizard", "src\Honu.Maui.Wizard\Honu.Maui.Wizard.csproj", "{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A01}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Honu.Maui.Wizard.Sample", "samples\Honu.Maui.Wizard.Sample\Honu.Maui.Wizard.Sample.csproj", "{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_Solution Items", "_Solution Items", "{D42B6039-73A3-4306-B165-F6BBF7062D10}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		.github\workflows\ci.yml = .github\workflows\ci.yml
+		targets\default.targets = targets\default.targets
+		Directory.Build.props = Directory.Build.props
+		LICENSE = LICENSE
+		README.md = README.md
+		targets\version.targets = targets\version.targets
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{E64D18EB-BFB1-4B5C-BC57-AA8264FBCCF8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{A04DA432-5066-4DB5-93DD-4B2E1164DD7E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{B71C2E45-9D3F-4A18-8C22-5E7D91A4F3C6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Honu.Maui.Wizard.Tests", "tests\Honu.Maui.Wizard.Tests\Honu.Maui.Wizard.Tests.csproj", "{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A04}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A04}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A01} = {E64D18EB-BFB1-4B5C-BC57-AA8264FBCCF8}
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A03} = {A04DA432-5066-4DB5-93DD-4B2E1164DD7E}
+		{1B7A0E5C-2D2A-4C7B-9C61-3D5E8A1F0A04} = {B71C2E45-9D3F-4A18-8C22-5E7D91A4F3C6}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7C60FF9A-868F-4BC7-8D0E-93D66365EDF3}
+	EndGlobalSection
+EndGlobal

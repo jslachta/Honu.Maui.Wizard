@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Honu.Maui.Wizard.Sample.DonePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Honu.Maui.Wizard.Sample.Models"
+    x:DataType="models:WizardResult"
+    Title="All set">
+
+    <!-- The wizard is done; there is nothing to navigate back to. -->
+    <Shell.BackButtonBehavior>
+        <BackButtonBehavior IsEnabled="False" IsVisible="False" />
+    </Shell.BackButtonBehavior>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label
+                Text="Setup is complete."
+                FontSize="22"
+                FontAttributes="Bold" />
+            <Label
+                Text="This is how the app is configured. Nothing is stored anywhere — start the app again and the wizard runs from the top."
+                FontSize="13"
+                Opacity="0.8" />
+
+            <Grid
+                ColumnDefinitions="Auto,*"
+                RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                ColumnSpacing="12"
+                RowSpacing="8">
+                <Label Grid.Row="0" Grid.Column="0" Text="Environment" FontAttributes="Bold" />
+                <Label Grid.Row="0" Grid.Column="1" Text="{Binding Server}" />
+
+                <Label Grid.Row="1" Grid.Column="0" Text="Appearance" FontAttributes="Bold" />
+                <Label Grid.Row="1" Grid.Column="1" Text="{Binding Appearance}" />
+
+                <Label Grid.Row="2" Grid.Column="0" Text="Notifications" FontAttributes="Bold" />
+                <Label Grid.Row="2" Grid.Column="1" Text="{Binding Notifications}" />
+
+                <Label Grid.Row="3" Grid.Column="0" Text="Advanced" FontAttributes="Bold" />
+                <Label Grid.Row="3" Grid.Column="1" Text="{Binding Advanced}" />
+
+                <Label Grid.Row="4" Grid.Column="0" Text="Topics" FontAttributes="Bold" />
+                <Label Grid.Row="4" Grid.Column="1" Text="{Binding Topics}" />
+
+                <Label Grid.Row="5" Grid.Column="0" Text="Profile" FontAttributes="Bold" />
+                <Label Grid.Row="5" Grid.Column="1" Text="{Binding Profile}" />
+            </Grid>
+
+            <Button Text="Quit the app" Clicked="OnQuitClicked" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

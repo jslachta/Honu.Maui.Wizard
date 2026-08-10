@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Honu.Maui.Wizard.Sample.WizardPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:honu="http://schemas.slachta.eu/honu/maui"
+    xmlns:models="clr-namespace:Honu.Maui.Wizard.Sample.Models"
+    xmlns:vm="clr-namespace:Honu.Maui.Wizard.Sample.ViewModels"
+    x:DataType="vm:WizardViewModel"
+    Title="Sample wizard">
+
+    <!--
+        Every step demonstrates a different family of input controls and carries its own gate.
+        The view model gates navigation through NavigatingCommand and closes the wizard through
+        FinishCommand; the one thing left in code-behind is the conditional step, because
+        IsStepVisible cannot be bound - see WizardStep.IsStepVisible.
+
+        The button captions are set explicitly to show they are localizable; "Continue" instead
+        of the default "Next" makes that visible.
+    -->
+    <Grid>
+        <honu:WizardControl
+            x:Name="Wizard"
+            BackText="Back"
+            NextText="Continue"
+            FinishText="Finish"
+            ShowStepTitle="True"
+            IsFinishEnabled="{Binding IsFinishEnabled}"
+            NavigatingCommand="{Binding NavigatingCommand}"
+            FinishCommand="{Binding FinishCommand}"
+            StepVisibilityEvaluating="OnStepVisibilityEvaluating">
+            <honu:WizardControl.Steps>
+
+            <!-- 1. Intro - text only, no gate. -->
+            <honu:WizardStep StepId="intro" Title="Welcome">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="12">
+                        <Label
+                            Text="Set up the sample app"
+                            FontSize="24"
+                            FontAttributes="Bold" />
+                        <Label Text="Each step shows a different kind of input — list selection, switches, a slider, multi-select and text fields. You will see a summary of everything at the end." />
+                        <Label
+                            Text="Steps with something missing will not let you continue — the wizard tells you what to fill in."
+                            FontSize="13"
+                            Opacity="0.7" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+            <!-- 2. CollectionView (single selection) + conditional Entry for a custom address. -->
+            <honu:WizardStep StepId="server" Title="Environment">
+                <Grid
+                    Padding="16"
+                    RowDefinitions="Auto,*,Auto,Auto"
+                    RowSpacing="12">
+                    <Label Grid.Row="0" Text="Pick the environment the app should connect to." />
+
+                    <CollectionView
+                        Grid.Row="1"
+                        ItemsSource="{Binding ConnectionOptions}"
+                        SelectionMode="Single"
+                        SelectedItem="{Binding SelectedConnection, Mode=TwoWay}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:ConnectionOption">
+                                <Border Margin="0,4" Padding="10" StrokeThickness="1">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                        <Label Text="{Binding UrlDisplay}" FontSize="12" />
+                                        <Label
+                                            Text="{Binding Description}"
+                                            FontSize="12"
+                                            Opacity="0.8"
+                                            LineBreakMode="WordWrap" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <VerticalStackLayout Grid.Row="2" Spacing="8">
+                        <!-- Only shown for the "Custom address" option. -->
+                        <VerticalStackLayout Spacing="4" IsVisible="{Binding IsCustomConnection}">
+                            <Label Text="Server address" FontAttributes="Bold" FontSize="13" />
+                            <Entry
+                                Placeholder="https://192.168.1.10:5000"
+                                Keyboard="Url"
+                                Text="{Binding CustomServerUrl, Mode=TwoWay}" />
+                        </VerticalStackLayout>
+
+                        <!-- Continuing waits for a reachability check; this forces it to fail. -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Label
+                                Grid.Column="0"
+                                Text="Simulate an unreachable server"
+                                FontSize="13"
+                                VerticalOptions="Center" />
+                            <Switch
+                                Grid.Column="1"
+                                IsToggled="{Binding SimulateUnreachableServer, Mode=TwoWay}"
+                                VerticalOptions="Center" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <Label
+                        Grid.Row="3"
+                        Style="{StaticResource ValidationLabel}"
+                        Text="{Binding ServerError}"
+                        IsVisible="{Binding HasServerError}" />
+                </Grid>
+            </honu:WizardStep>
+
+            <!-- 3. RadioButton group + Picker. -->
+            <honu:WizardStep StepId="appearance" Title="Appearance">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="16">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Theme" FontAttributes="Bold" />
+                            <VerticalStackLayout
+                                Spacing="4"
+                                RadioButtonGroup.GroupName="theme"
+                                RadioButtonGroup.SelectedValue="{Binding Theme, Mode=TwoWay}">
+                                <RadioButton Value="light" Content="Light" />
+                                <RadioButton Value="dark" Content="Dark" />
+                                <RadioButton Value="system" Content="Match the system" />
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Language" FontAttributes="Bold" />
+                            <Picker
+                                Title="Pick a language"
+                                ItemsSource="{Binding Languages}"
+                                SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" />
+                        </VerticalStackLayout>
+
+                        <Label
+                            Style="{StaticResource ValidationLabel}"
+                            Text="{Binding AppearanceError}"
+                            IsVisible="{Binding HasAppearanceError}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+            <!-- 4. Switch + CheckBox; one switch drives the conditional step. -->
+            <honu:WizardStep StepId="notifications" Title="Notifications">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="16">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Send notifications" FontAttributes="Bold" />
+                                <Label
+                                    Text="Alerts about new releases and finished work."
+                                    FontSize="13"
+                                    Opacity="0.8" />
+                            </VerticalStackLayout>
+                            <Switch
+                                Grid.Column="1"
+                                IsToggled="{Binding AreNotificationsEnabled, Mode=TwoWay}"
+                                VerticalOptions="Center" />
+                        </Grid>
+
+                        <!-- Sound only matters while notifications are on. -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Sound" FontAttributes="Bold" />
+                                <Label
+                                    Text="Has no effect while notifications are off."
+                                    FontSize="13"
+                                    Opacity="0.8" />
+                            </VerticalStackLayout>
+                            <Switch
+                                Grid.Column="1"
+                                IsToggled="{Binding IsSoundEnabled, Mode=TwoWay}"
+                                IsEnabled="{Binding AreNotificationsEnabled}"
+                                VerticalOptions="Center" />
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="8">
+                            <CheckBox IsChecked="{Binding HasAcceptedTerms, Mode=TwoWay}" VerticalOptions="Center" />
+                            <Label
+                                Text="I agree to receive notifications."
+                                VerticalOptions="Center"
+                                LineBreakMode="WordWrap" />
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Show advanced options" FontAttributes="Bold" />
+                                <Label
+                                    Text="Adds another step with a slider and a stepper."
+                                    FontSize="13"
+                                    Opacity="0.8" />
+                            </VerticalStackLayout>
+                            <Switch
+                                Grid.Column="1"
+                                IsToggled="{Binding ShowAdvanced, Mode=TwoWay}"
+                                VerticalOptions="Center" />
+                        </Grid>
+
+                        <Label
+                            Style="{StaticResource ValidationLabel}"
+                            Text="{Binding NotificationsError}"
+                            IsVisible="{Binding HasNotificationsError}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+            <!-- 5. Slider + Stepper. Conditional step, see OnStepVisibilityEvaluating. -->
+            <honu:WizardStep
+                StepId="advanced"
+                Title="Advanced"
+                IsStepVisible="False">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="16">
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" Text="Font size in lists" FontAttributes="Bold" />
+                                <Label Grid.Column="1" Text="{Binding ListFontSizeDisplay}" />
+                            </Grid>
+                            <Slider
+                                Minimum="12"
+                                Maximum="24"
+                                Value="{Binding ListFontSize, Mode=TwoWay}" />
+                            <Border Padding="10" StrokeThickness="1">
+                                <Label Text="This is how list text will look." FontSize="{Binding ListFontSize}" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" Text="Items per page" FontAttributes="Bold" />
+                                <Label Grid.Column="1" Text="{Binding ItemsPerPageDisplay}" />
+                            </Grid>
+                            <Stepper
+                                Minimum="5"
+                                Maximum="50"
+                                Increment="5"
+                                Value="{Binding ItemsPerPage, Mode=TwoWay}"
+                                HorizontalOptions="Start" />
+                            <Label
+                                Text="Large text together with many items will not let you continue — an example of a rule spanning two fields."
+                                FontSize="13"
+                                Opacity="0.7" />
+                        </VerticalStackLayout>
+
+                        <Label
+                            Style="{StaticResource ValidationLabel}"
+                            Text="{Binding AdvancedError}"
+                            IsVisible="{Binding HasAdvancedError}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+            <!-- 6. Multi-select through BindableLayout + CheckBox. -->
+            <honu:WizardStep StepId="topics" Title="Topics">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="14">
+                        <Label Text="What would you like to hear about? Pick at least two topics." />
+
+                        <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding Topics}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:TopicItemViewModel">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                        <CheckBox
+                                            Grid.Column="0"
+                                            IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                            VerticalOptions="Start" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                            <Label
+                                                Text="{Binding Description}"
+                                                FontSize="13"
+                                                Opacity="0.8"
+                                                LineBreakMode="WordWrap" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+
+                        <Label
+                            Style="{StaticResource ValidationLabel}"
+                            Text="{Binding TopicsError}"
+                            IsVisible="{Binding HasTopicsError}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+            <!-- 7. Entry, Editor, DatePicker, TimePicker. -->
+            <honu:WizardStep StepId="profile" Title="Profile">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="14">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Display name" FontAttributes="Bold" />
+                            <Entry Placeholder="What should we call you" Text="{Binding DisplayName, Mode=TwoWay}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="About you" FontAttributes="Bold" />
+                            <Editor
+                                Placeholder="A couple of sentences is plenty"
+                                HeightRequest="100"
+                                Text="{Binding Bio, Mode=TwoWay}" />
+                            <Label Text="{Binding BioLengthDisplay}" FontSize="12" Opacity="0.7" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Date of birth" FontAttributes="Bold" />
+                            <DatePicker Format="d" Date="{Binding BirthDate, Mode=TwoWay}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="When to send the daily digest" FontAttributes="Bold" />
+                            <TimePicker Format="HH:mm" Time="{Binding DigestTime, Mode=TwoWay}" />
+                        </VerticalStackLayout>
+
+                        <Label
+                            Style="{StaticResource ValidationLabel}"
+                            Text="{Binding ProfileError}"
+                            IsVisible="{Binding HasProfileError}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+            <!-- 8. Summary - Finish only lights up once confirmed, see IsFinishEnabled. -->
+            <honu:WizardStep StepId="summary" Title="Summary">
+                <ScrollView>
+                    <VerticalStackLayout Padding="16" Spacing="14">
+                        <Label Text="Check the settings and finish the wizard." />
+
+                        <Grid
+                            ColumnDefinitions="Auto,*"
+                            RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                            ColumnSpacing="12"
+                            RowSpacing="8">
+                            <Label Grid.Row="0" Grid.Column="0" Text="Environment" FontAttributes="Bold" />
+                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding SummaryServer}" />
+
+                            <Label Grid.Row="1" Grid.Column="0" Text="Appearance" FontAttributes="Bold" />
+                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding SummaryAppearance}" />
+
+                            <Label Grid.Row="2" Grid.Column="0" Text="Notifications" FontAttributes="Bold" />
+                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding SummaryNotifications}" />
+
+                            <Label Grid.Row="3" Grid.Column="0" Text="Advanced" FontAttributes="Bold" />
+                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding SummaryAdvanced}" />
+
+                            <Label Grid.Row="4" Grid.Column="0" Text="Topics" FontAttributes="Bold" />
+                            <Label Grid.Row="4" Grid.Column="1" Text="{Binding SummaryTopics}" />
+
+                            <Label Grid.Row="5" Grid.Column="0" Text="Profile" FontAttributes="Bold" />
+                            <Label Grid.Row="5" Grid.Column="1" Text="{Binding SummaryProfile}" />
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="8">
+                            <CheckBox IsChecked="{Binding IsSummaryConfirmed, Mode=TwoWay}" VerticalOptions="Center" />
+                            <Label Text="I confirm these settings are correct." VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+
+                        <Label
+                            Text="Until that is ticked, the Finish button stays disabled."
+                            FontSize="13"
+                            Opacity="0.7" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </honu:WizardStep>
+
+        </honu:WizardControl.Steps>
+        </honu:WizardControl>
+
+        <!-- Visible while a deferred Navigating handler keeps the wizard waiting. -->
+        <ActivityIndicator
+            HorizontalOptions="Center"
+            VerticalOptions="Center"
+            IsRunning="{Binding IsNavigating, Source={x:Reference Wizard}, x:DataType=honu:WizardControl}"
+            IsVisible="{Binding IsNavigating, Source={x:Reference Wizard}, x:DataType=honu:WizardControl}" />
+    </Grid>
+</ContentPage>

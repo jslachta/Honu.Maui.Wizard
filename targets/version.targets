@@ -1,0 +1,162 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+	<ItemGroup>
+		<PackageReference Include="GitInfo" Version="3.6.1">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="ThisAssembly.AssemblyInfo" Version="2.1.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="MSBuilder.GenerateAssemblyInfo" Version="0.2.2" PrivateAssets="All" />
+	</ItemGroup>
+
+	<!-- GitInfo nastavení -->
+	<PropertyGroup>
+		<GitTagRegex Condition="'$(GitTagRegex)' == ''">v*</GitTagRegex>
+		<GitInfoReportImportance>high</GitInfoReportImportance>
+	</PropertyGroup>
+
+	<!-- MSBuild target dependencies -->
+	<PropertyGroup>
+		<CoreCompileDependsOn>
+			SetVersions;
+			$(CoreCompileDependsOn);
+		</CoreCompileDependsOn>
+		<GenerateNuspecDependsOn>
+			SetVersions;
+			$(GenerateNuspecDependsOn);
+		</GenerateNuspecDependsOn>
+		<GetPackageVersionDependsOn>
+			SetVersions;
+			$(GetPackageVersionDependsOn);
+		</GetPackageVersionDependsOn>
+		<SetVersionsBefore>
+			GetAssemblyVersion;
+			$(SetVersionsBefore);
+		</SetVersionsBefore>
+		<SetVersionsDependsOn>
+			GitInfo;
+			GitVersion;
+			$(SetVersionsDependsOn);
+		</SetVersionsDependsOn>
+		<SetGitInfoPropsBefore>
+			GitInfo;
+			GitVersion;
+		</SetGitInfoPropsBefore>
+	</PropertyGroup>
+
+	<!-- Detekce CI přes vlastní proměnnou IS_CI -->
+	<PropertyGroup>
+		<IsCI Condition="'$(IS_CI)' == 'true'">true</IsCI>
+		<IsCI Condition="'$(IsCI)' == ''">false</IsCI>
+	</PropertyGroup>
+
+	<Target Name="SetVersions" BeforeTargets="$(SetVersionsBefore)" DependsOnTargets="$(SetVersionsDependsOn)">
+		<PropertyGroup>
+			<!--
+				Větev a commit.
+
+				GitInfo vlastní GitBranch i GitCommit. Když se předají přes /p: jako globální
+				MSBuild properties, GitInfo si je nemůže nastavit, jeho vlastní výpočet skončí
+				na prázdných hodnotách a build spadne na MSB4186 přímo v GitInfo.targets.
+				Proto vlastní názvy, které GitInfo nezná: CI je dodá přes ně, jinak se použije
+				to, co spočítal GitInfo.
+			-->
+			<CiBranch Condition="'$(CiBranch)' == ''">$(CI_COMMIT_BRANCH)</CiBranch>
+			<CiBranch Condition="'$(CiBranch)' == ''">$(GitBranch)</CiBranch>
+			<CiBranch Condition="'$(CiBranch)' == ''">local-branch</CiBranch>
+
+			<CiCommit Condition="'$(CiCommit)' == ''">$(CI_COMMIT_SHORT_SHA)</CiCommit>
+			<CiCommit Condition="'$(CiCommit)' == ''">$(GitCommit)</CiCommit>
+			<CiCommit Condition="'$(CiCommit)' == ''">local-commit</CiCommit>
+
+			<!-- Sanitizovaný název větve -->
+			<BranchCustom>$([System.Text.RegularExpressions.Regex]::Replace($(CiBranch), "[^a-zA-Z0-9_-]", "-"))</BranchCustom>
+
+			<!-- Indikuje, zda je to CI tagovaný build = branch je pak ve formátu tag/{tag} -->
+			<IsTagBuild>false</IsTagBuild>
+			<IsTagBuild Condition="$(CiBranch.StartsWith('tags/'))">true</IsTagBuild>
+
+			<!-- Branch typy -->
+			<IsMainBranch>false</IsMainBranch>
+			<IsMainBranch Condition="'$(CiBranch)' == 'main'">true</IsMainBranch>
+			<IsReleaseBranch>false</IsReleaseBranch>
+			<IsReleaseBranch Condition="$(CiBranch.StartsWith('release'))">true</IsReleaseBranch>
+			<IsHotfixBranch>false</IsHotfixBranch>
+			<IsHotfixBranch Condition="$(CiBranch.StartsWith('hotfix'))">true</IsHotfixBranch>
+
+			<!--
+				Počet commitů od posledního tagu.
+
+				GitInfo si GitCommits nastavuje sám a /p:GitCommits= z příkazové řádky přepíše,
+				takže hodnotu z CI nelze předat přes něj. CommitsSinceTag GitInfo nevlastní:
+				když ji CI dodá (spočítanou v pipeline pomocí git rev-list), použije se,
+				jinak se spadne zpět na to, co spočítal GitInfo.
+			-->
+			<CommitsSinceTag Condition="'$(CommitsSinceTag)' == ''">$(GitCommits)</CommitsSinceTag>
+
+			<!-- Verze -->
+			<!-- Základní build číslo = počet commitů od posledního tagu -->
+			<BuildNumber>$(CommitsSinceTag)</BuildNumber>
+
+			<!--
+				Na ne-main / ne-release / ne-tag větvích přičti 1000 kvůli prevenci kolizí
+				s oficiálními buildy (kulaté verze i snapshopy na main/release).
+			-->
+			<BuildNumber Condition="'$(IsMainBranch)' != 'true'
+								and '$(IsReleaseBranch)' != 'true'
+								and '$(IsTagBuild)' != 'true'">$([MSBuild]::Add($(CommitsSinceTag), 1000))</BuildNumber>
+
+			<!--
+				POZOR: hodnota property musí být na jednom řádku. MSBuild whitespace v hodnotě
+				neořezává, takže víceřádkový zápis vyrobí verzi s odřádkováním a tabulátory.
+			-->
+
+			<!-- Verze snapshotu na ostatních větvích: major.minor.patch.BuildNumber-Branch.Commit -->
+			<Version>$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch).$(BuildNumber)-$(BranchCustom).$(CiCommit)</Version>
+
+			<!--
+				Patch v tagu rozhoduje, o jaký druh vydání jde:
+
+				  patch == 0  vývojová řada, nikdy se nevydává stabilně -> vždy preview
+				  patch > 0   vydání
+
+				Díky tomu může CI publikovat na každý tag bez výjimek: tag v10.0.0 vyrobí
+				10.0.0-preview.0 (otevření vývojové řady), tag v10.0.1 vyrobí stabilní 10.0.1.
+
+				Preview se řadí pod stabilní verzi téhož čísla (10.0.0-preview.8 < 10.0.0),
+				proto se na patchi 0 stabilní verze nikdy nevydává. Po stabilním vydání je
+				potřeba otevřít další vývojovou řadu tagem s patchem 0 (v10.1.0), jinak by se
+				následující previews řadily pod právě vydanou verzi.
+			-->
+
+			<!-- Preview: vývojová řada, nebo cokoli netagovaného na main/release -->
+			<Version Condition="( ('$(IsMainBranch)' == 'true'
+								or '$(IsReleaseBranch)' == 'true'
+								or '$(IsTagBuild)' == 'true')
+								and ('$(GitBaseVersionPatch)' == '0' or '$(CommitsSinceTag)' != '0') )">$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)-preview.$(CommitsSinceTag)</Version>
+
+			<!-- Stabilní vydání: tag s patchem > 0, přesně na tagu -->
+			<Version Condition="( ('$(IsMainBranch)' == 'true'
+								or '$(IsReleaseBranch)' == 'true'
+								or '$(IsTagBuild)' == 'true')
+								and '$(GitBaseVersionPatch)' != '0'
+								and '$(CommitsSinceTag)' == '0' )">$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)</Version>
+
+			<!-- Metadata pro NuGet / assembly -->
+			<PackageVersion>$(Version)</PackageVersion>
+			<RepositoryBranch>$(CiBranch)</RepositoryBranch>
+			<RepositoryCommit>$(CiCommit)</RepositoryCommit>
+			<SourceRevisionId>$(CiBranch) $(CiCommit)</SourceRevisionId>
+			<AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
+
+			<GitDefaultBranch>main</GitDefaultBranch>
+			<GitIgnoreBranchVersion>true</GitIgnoreBranchVersion>
+			<GitIgnoreTagVersion>true</GitIgnoreTagVersion>
+			<GitVersion>false</GitVersion>
+		</PropertyGroup>
+	</Target>
+
+</Project>

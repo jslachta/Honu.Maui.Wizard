@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Grid
+    x:Class="Honu.Maui.Wizard.WizardControl"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:wizard="clr-namespace:Honu.Maui.Wizard"
+    x:Name="Root"
+    RowDefinitions="Auto,*,Auto"
+    ColumnDefinitions="*">
+
+    <!-- Optional title of the current step -->
+    <Label
+        Grid.Row="0"
+        Padding="12,12,12,0"
+        FontAttributes="Bold"
+        FontSize="18"
+        IsVisible="{Binding ShowStepTitle, Source={x:Reference Root}, x:DataType=wizard:WizardControl}"
+        Text="{Binding CurrentStepTitle, Source={x:Reference Root}, x:DataType=wizard:WizardControl}" />
+
+    <!-- Step host -->
+    <wizard:WizardFrame
+        x:Name="StepsFrame"
+        Grid.Row="1"
+        TransitionDuration="{Binding TransitionDuration, Source={x:Reference Root}, x:DataType=wizard:WizardControl}" />
+
+    <!-- Navigation buttons -->
+    <Grid
+        Grid.Row="2"
+        Padding="12"
+        ColumnDefinitions="Auto,*,Auto">
+        <Button
+            Grid.Column="0"
+            Clicked="OnBackClicked"
+            IsVisible="{Binding IsBackVisible, Source={x:Reference Root}, x:DataType=wizard:WizardControl}"
+            Text="{Binding BackText, Source={x:Reference Root}, x:DataType=wizard:WizardControl}" />
+        <HorizontalStackLayout Grid.Column="2" Spacing="8">
+            <Button
+                Clicked="OnNextClicked"
+                IsVisible="{Binding IsNextVisible, Source={x:Reference Root}, x:DataType=wizard:WizardControl}"
+                Text="{Binding NextText, Source={x:Reference Root}, x:DataType=wizard:WizardControl}" />
+            <Button
+                Clicked="OnFinishClicked"
+                IsEnabled="{Binding IsFinishEnabled, Source={x:Reference Root}, x:DataType=wizard:WizardControl}"
+                IsVisible="{Binding IsFinishVisible, Source={x:Reference Root}, x:DataType=wizard:WizardControl}"
+                Text="{Binding FinishText, Source={x:Reference Root}, x:DataType=wizard:WizardControl}" />
+        </HorizontalStackLayout>
+    </Grid>
+</Grid>

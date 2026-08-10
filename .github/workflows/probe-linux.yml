@@ -1,0 +1,42 @@
+name: Probe - Linux without the prebuilt image
+
+# Manual fallback check. ci.yml builds inside ghcr.io/maui-containers/maui-linux, which already
+# carries the MAUI workloads. This probe answers what happens without it: can a plain
+# ubuntu-latest runner install what UseMaui=true needs and build the library?
+#
+# Run it if the image ever becomes unavailable or stops matching the project, then move the
+# working steps into ci.yml. Delete this file once ci.yml has settled.
+on:
+  workflow_dispatch:
+
+jobs:
+  workloads:
+    name: ubuntu-latest + workload install
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: What is on offer here?
+        run: dotnet workload search
+
+      - name: Install workload
+        run: dotnet workload restore src/Honu.Maui.Wizard/Honu.Maui.Wizard.csproj
+
+      - name: Installed workloads
+        run: dotnet workload list
+
+      - name: Build
+        run: dotnet build src/Honu.Maui.Wizard/Honu.Maui.Wizard.csproj -c Release
+
+      - name: Test
+        run: dotnet test tests/Honu.Maui.Wizard.Tests/Honu.Maui.Wizard.Tests.csproj -c Release
+
+      - name: Pack
+        run: dotnet pack src/Honu.Maui.Wizard/Honu.Maui.Wizard.csproj -c Release -o artifacts

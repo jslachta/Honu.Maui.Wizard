@@ -1,0 +1,53 @@
+name: Publish snapshot
+
+# Manual publish of the current state of a branch. Running this workflow publishes - there is
+# no checkbox to remember and nothing to opt into. Picking it from the Actions list is the
+# decision.
+#
+# No GitHub release is created: a snapshot is not a release. Tagging does that, through ci.yml.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    name: Push to GitHub Packages
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: packages
+
+      # --skip-duplicate means a second run from the same commit publishes nothing: the version
+      # is derived from the commit count since the last tag, so it would be the same number.
+      # A new snapshot needs a new commit.
+      - name: Push to GitHub Packages
+        run: >
+          dotnet nuget push "packages/*.nupkg"
+          --api-key "${{ secrets.GITHUB_TOKEN }}"
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --skip-duplicate
+
+      - name: Summary
+        run: |
+          echo "### Published ${{ needs.build.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "From \`${{ github.ref_name }}\` to GitHub Packages." >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,14 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<!-- Common -->
+	<PropertyGroup>
+		<RepoRoot>$([System.IO.Path]::GetDirectoryName($([MSBuild]::GetPathOfFileAbove('.gitignore', '$(MSBuildThisFileDirectory)'))))</RepoRoot>
+		<RootNamespace Condition=" '$(AssemblyRootNamespace)' != ''">$(AssemblyRootNamespace)</RootNamespace>
+		<RootNamespace Condition=" '$(AssemblyRootNamespace)' == '' And '$(PackageId)' != ''">$(PackageId)</RootNamespace>
+		<AssemblyName Condition=" '$(PackageId)' != ''">$(PackageId)</AssemblyName>
+		<IsPackable Condition="'$(PackageId)' != ''">true</IsPackable>
+		<IsPackable Condition="'$(PackageId)' == ''">false</IsPackable>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<Import Project="version.targets" />
+</Project>

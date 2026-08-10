@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Application
+    x:Class="Honu.Maui.Wizard.Sample.App"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <Color x:Key="Primary">#0B6E4F</Color>
+            <Color x:Key="OnPrimary">White</Color>
+            <Color x:Key="Error">#B3261E</Color>
+            <Color x:Key="Disabled">#C4C7C5</Color>
+            <Color x:Key="DisabledText">#5F6368</Color>
+
+            <Style x:Key="ValidationLabel" TargetType="Label">
+                <Setter Property="TextColor" Value="{StaticResource Error}" />
+                <Setter Property="FontSize" Value="13" />
+            </Style>
+
+            <!--
+                ApplyToDerivedTypes matters: the app's shell is AppShell, and an implicit style
+                targeting Shell would not reach it otherwise.
+            -->
+            <Style TargetType="Shell" ApplyToDerivedTypes="True">
+                <Setter Property="Shell.BackgroundColor" Value="{StaticResource Primary}" />
+                <Setter Property="Shell.ForegroundColor" Value="{StaticResource OnPrimary}" />
+                <Setter Property="Shell.TitleColor" Value="{StaticResource OnPrimary}" />
+                <Setter Property="Shell.DisabledColor" Value="#80FFFFFF" />
+                <Setter Property="Shell.UnselectedColor" Value="#B3FFFFFF" />
+            </Style>
+
+            <!--
+                An implicit Button style replaces the MAUI default wholesale, including its
+                VisualStateManager - without these states a disabled button would keep the
+                green background and look clickable.
+            -->
+            <Style TargetType="Button">
+                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                <Setter Property="TextColor" Value="{StaticResource OnPrimary}" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16,10" />
+                <Setter Property="VisualStateManager.VisualStateGroups">
+                    <VisualStateGroupList>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="Disabled">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Disabled}" />
+                                    <Setter Property="TextColor" Value="{StaticResource DisabledText}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                        </VisualStateGroup>
+                    </VisualStateGroupList>
+                </Setter>
+            </Style>
+
+            <!-- The input controls the sample shows off, tinted to match. -->
+            <Style TargetType="CheckBox">
+                <Setter Property="Color" Value="{StaticResource Primary}" />
+            </Style>
+
+            <!--
+                RadioButton is left alone on purpose: it exposes no cross-platform colour for
+                the mark itself, and tinting TextColor would just turn the labels green.
+            -->
+            <Style TargetType="Switch">
+                <Setter Property="OnColor" Value="{StaticResource Primary}" />
+            </Style>
+
+            <Style TargetType="Slider">
+                <Setter Property="MinimumTrackColor" Value="{StaticResource Primary}" />
+                <Setter Property="ThumbColor" Value="{StaticResource Primary}" />
+            </Style>
+
+            <Style TargetType="ActivityIndicator">
+                <Setter Property="Color" Value="{StaticResource Primary}" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

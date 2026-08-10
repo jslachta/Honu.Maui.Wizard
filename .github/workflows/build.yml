@@ -1,0 +1,175 @@
+name: Build
+
+# Shared by ci.yml and publish.yml so the two never drift apart. Not triggerable on its own -
+# it has no push, pull_request or workflow_dispatch trigger, so it does not clutter the
+# Actions list with a runnable entry.
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: Package version produced by this build.
+        value: ${{ jobs.build.outputs.version }}
+      prerelease:
+        description: Whether that version carries a prerelease label.
+        value: ${{ jobs.build.outputs.prerelease }}
+
+env:
+  # targets/version.targets reads this.
+  IS_CI: 'true'
+  CONFIGURATION: Release
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  # Only what ships is built here: the sample app is never published and is not part of the
+  # release path. The library targets net10.0 alone and contains no platform-specific code, so
+  # no Android or iOS SDK is involved and a Linux host is enough.
+  build:
+    name: Library and tests
+    runs-on: ubuntu-latest
+
+    # The image already carries the .NET SDK and the MAUI workloads, so there is no workload
+    # install step. If it ever stops matching what the project needs, drop this container and
+    # use actions/setup-dotnet plus "dotnet workload restore" on a plain ubuntu-latest instead.
+    container:
+      image: ghcr.io/maui-containers/maui-linux:dotnet10.0
+      # The image runs as an unprivileged user, but the runner mounts its work and temp
+      # directories into the container with ownership that user cannot write to - actions/checkout
+      # fails with EACCES on /__w/_temp before it does anything else. Running as root is the
+      # standard answer for container jobs.
+      options: --user root
+
+    outputs:
+      version: ${{ steps.pack.outputs.version }}
+      prerelease: ${{ steps.pack.outputs.prerelease }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # GitInfo derives the base version from the nearest v* tag, so the full history and
+          # the tags have to be there. The default shallow checkout would silently yield 0.0.0.
+          fetch-depth: 0
+
+      - name: Environment
+        run: |
+          dotnet --info
+          dotnet workload list
+
+      # The checkout is owned by a different uid than git ends up running as inside the
+      # container, which git refuses to touch. The version below is derived from git history,
+      # so this has to work.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Resolve version inputs
+        id: version
+        shell: bash
+        run: |
+          # Fail loudly rather than falling through to an empty version: a missing git history
+          # would otherwise quietly produce a nonsense package version.
+          set -euo pipefail
+
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            GIT_BRANCH="tags/${{ github.ref_name }}"
+            COMMITS=0
+          else
+            GIT_BRANCH="${{ github.ref_name }}"
+            LAST_TAG=$(git describe --tags --match "v*" --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$LAST_TAG" ]; then
+              COMMITS=$(git rev-list --count "${LAST_TAG}..HEAD")
+            else
+              COMMITS=$(git rev-list --count HEAD)
+            fi
+          fi
+
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
+          echo "branch=$GIT_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "commit=$GIT_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "commits=$COMMITS"   >> "$GITHUB_OUTPUT"
+
+          echo "CiBranch        = $GIT_BRANCH"
+          echo "CiCommit        = $GIT_COMMIT"
+          echo "Last version tag= ${LAST_TAG:-<none>}"
+          echo "CommitsSinceTag = $COMMITS"
+
+      - name: Restore
+        run: dotnet restore tests/Honu.Maui.Wizard.Tests/Honu.Maui.Wizard.Tests.csproj
+
+      # The version properties are MSBuild *global* properties, so they are part of a project's
+      # identity. Passing them to some commands and not others would build the library twice
+      # and leave the second, differently stamped copy in the output. Keep them identical
+      # across build, test and pack.
+      #
+      # CiBranch / CiCommit / CommitsSinceTag rather than GitBranch / GitCommit / GitCommits:
+      # GitInfo owns the latter, cannot have them supplied as global properties, and fails with
+      # MSB4186 when they are.
+      - name: Build library
+        run: >
+          dotnet build src/Honu.Maui.Wizard/Honu.Maui.Wizard.csproj
+          -c ${{ env.CONFIGURATION }}
+          --no-restore
+          -p:CiBranch=${{ steps.version.outputs.branch }}
+          -p:CiCommit=${{ steps.version.outputs.commit }}
+          -p:CommitsSinceTag=${{ steps.version.outputs.commits }}
+
+      - name: Test
+        run: >
+          dotnet test tests/Honu.Maui.Wizard.Tests/Honu.Maui.Wizard.Tests.csproj
+          -c ${{ env.CONFIGURATION }}
+          --no-restore
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory artifacts/test-results
+          -p:CiBranch=${{ steps.version.outputs.branch }}
+          -p:CiCommit=${{ steps.version.outputs.commit }}
+          -p:CommitsSinceTag=${{ steps.version.outputs.commits }}
+
+      - name: Pack
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dotnet pack src/Honu.Maui.Wizard/Honu.Maui.Wizard.csproj \
+            -c "$CONFIGURATION" \
+            --no-build \
+            -o artifacts/packages \
+            -p:CiBranch=${{ steps.version.outputs.branch }} \
+            -p:CiCommit=${{ steps.version.outputs.commit }} \
+            -p:CommitsSinceTag=${{ steps.version.outputs.commits }}
+
+          PACKAGE=$(ls artifacts/packages/*.nupkg | head -1)
+          VERSION=$(basename "$PACKAGE" .nupkg | sed 's/^Honu\.Maui\.Wizard\.//')
+
+          # Anything with a prerelease label is not a stable release; the wizard's scheme puts
+          # development on -preview.N and ships stable only from a tag with patch > 0.
+          case "$VERSION" in
+            *-*) PRERELEASE=true ;;
+            *)   PRERELEASE=false ;;
+          esac
+
+          echo "version=$VERSION"       >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+          echo "Packed $VERSION (prerelease=$PRERELEASE)"
+          ls -1 artifacts/packages
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results
+          retention-days: 7

@@ -1,0 +1,12 @@
+<Project>
+	<PropertyGroup>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<WarningsAsErrors>nullable</WarningsAsErrors>
+	</PropertyGroup>
+
+	<!-- This target is replaced by GitInfo when restored. Allows Versions.targets to rely on it before restore. -->
+	<Target Name="GitVersion" />
+	<Target Name="GitInfo" />
+</Project>

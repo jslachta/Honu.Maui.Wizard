@@ -1,0 +1,10 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+*.nupkg
+*.snupkg
+
+# CI output (dotnet pack / dotnet test --results-directory)
+artifacts/
