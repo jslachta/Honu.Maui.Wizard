@@ -4,7 +4,9 @@ name: Publish snapshot
 # no checkbox to remember and nothing to opt into. Picking it from the Actions list is the
 # decision.
 #
-# No GitHub release is created: a snapshot is not a release. Tagging does that, through ci.yml.
+# The snapshot is published both to GitHub Packages and as a GitHub prerelease. The release
+# uses a snapshot-* tag so that it is clearly separated from normal release tags handled by
+# ci.yml.
 on:
   workflow_dispatch:
 
@@ -17,12 +19,13 @@ jobs:
     uses: ./.github/workflows/build.yml
 
   publish:
-    name: Push to GitHub Packages
+    name: Publish snapshot
     needs: build
     runs-on: ubuntu-latest
 
     permissions:
       packages: write
+      contents: write
 
     steps:
       - name: Setup .NET
@@ -37,8 +40,8 @@ jobs:
           path: packages
 
       # --skip-duplicate means a second run from the same commit publishes nothing: the version
-      # is derived from the commit count since the last tag, so it would be the same number.
-      # A new snapshot needs a new commit.
+      # is derived from the commit count since the last release tag, so it would be the same
+      # number. A new snapshot needs a new commit.
       - name: Push to GitHub Packages
         run: >
           dotnet nuget push "packages/*.nupkg"
@@ -46,8 +49,37 @@ jobs:
           --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
           --skip-duplicate
 
-      - name: Summary
+      # GitHub Releases always belong to a git tag. Snapshot tags therefore use their own
+      # namespace and should be ignored by release-version calculation in build.yml.
+      # Re-running the same snapshot uploads the package again instead of failing because the
+      # release already exists.
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          echo "### Published ${{ needs.build.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          TAG="snapshot-${VERSION}"
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" packages/*.nupkg \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$TAG" packages/*.nupkg \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Snapshot ${VERSION}" \
+              --notes "Snapshot of \`${GITHUB_REF_NAME}\` at \`${GITHUB_SHA}\`." \
+              --prerelease \
+              --latest=false
+          fi
+
+      - name: Summary
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          echo "### Published ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "From \`${{ github.ref_name }}\` to GitHub Packages." >> "$GITHUB_STEP_SUMMARY"
+          echo "From \`${GITHUB_REF_NAME}\` to GitHub Packages and GitHub Releases." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release tag: \`snapshot-${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
