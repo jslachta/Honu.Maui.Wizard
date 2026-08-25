@@ -3,7 +3,7 @@ using Microsoft.Maui.Controls;
 namespace Honu.Maui.Wizard;
 
 /// <summary>
-/// Describes one endpoint of a wizard navigation: where the step sits in the active flow
+/// Describes one endpoint of a wizard navigation: where the step sits in the step list
 /// (<see cref="Index"/>), which view it is (<see cref="Step"/>) and how the consumer identifies
 /// it (<see cref="StepId"/>).
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class WizardStepInfo
     #region Index (int)
 
     /// <summary>
-    /// Index of the step within the active flow (0-based).
+    /// Index of the step within <see cref="WizardControl.Steps"/> (0-based), skipped steps included.
     /// </summary>
     public int Index { get; }
 

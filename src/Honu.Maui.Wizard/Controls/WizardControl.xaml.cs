@@ -12,9 +12,14 @@ namespace Honu.Maui.Wizard;
 
 /// <summary>
 /// A multi-step wizard control. Steps are provided via <see cref="Steps"/>; navigation
-/// buttons, step transitions and conditional step visibility are handled by the control.
+/// buttons, step transitions and skipping are handled by the control.
 /// Being a plain <see cref="View"/>, it works both in Shell and non-Shell applications.
 /// </summary>
+/// <remarks>
+/// <see cref="Steps"/> is the wizard, in order and in full: every step keeps its place and its
+/// index whatever happens. Conditional steps are expressed by <see cref="WizardStep.IsSkipped"/>,
+/// which only makes <see cref="GoNextAsync"/> and <see cref="GoBackAsync"/> pass over them.
+/// </remarks>
 public partial class WizardControl : Grid
 {
     public WizardControl()
@@ -26,12 +31,6 @@ public partial class WizardControl : Grid
     }
 
     #region Events
-
-    /// <summary>
-    /// Raised while (re)building the wizard flow for every candidate step. A handler can
-    /// exclude a step by setting <see cref="StepVisibilityEventArgs.IsVisible"/> to false.
-    /// </summary>
-    public event EventHandler<StepVisibilityEventArgs>? StepVisibilityEvaluating;
 
     /// <summary>
     /// Raised before navigating between steps; cancelable, and deferrable for handlers that
@@ -209,7 +208,7 @@ public partial class WizardControl : Grid
     public static readonly BindableProperty IsBackVisibleProperty = IsBackVisiblePropertyKey.BindableProperty;
 
     /// <summary>
-    /// True on every step except the first one in the active flow.
+    /// True when some earlier step can be navigated back to.
     /// </summary>
     public bool IsBackVisible
     {
@@ -227,7 +226,7 @@ public partial class WizardControl : Grid
     public static readonly BindableProperty IsNextVisibleProperty = IsNextVisiblePropertyKey.BindableProperty;
 
     /// <summary>
-    /// True on every step except the last one in the active flow.
+    /// True when some later step can be navigated forward to.
     /// </summary>
     public bool IsNextVisible
     {
@@ -245,7 +244,7 @@ public partial class WizardControl : Grid
     public static readonly BindableProperty IsFinishVisibleProperty = IsFinishVisiblePropertyKey.BindableProperty;
 
     /// <summary>
-    /// True on the last step of the active flow.
+    /// True on the last step the user can reach - everything after it, if anything, is skipped.
     /// </summary>
     public bool IsFinishVisible
     {
@@ -283,7 +282,8 @@ public partial class WizardControl : Grid
     public static readonly BindableProperty CurrentStepIndexProperty = CurrentStepIndexPropertyKey.BindableProperty;
 
     /// <summary>
-    /// Index of the currently visible step within the active flow. -1 when none.
+    /// Index of the currently visible step within <see cref="Steps"/>, skipped steps included.
+    /// -1 when none.
     /// </summary>
     public int CurrentStepIndex
     {
@@ -302,7 +302,7 @@ public partial class WizardControl : Grid
 
     /// <summary>
     /// Descriptor of the currently visible step - its <see cref="WizardStepInfo.Index"/> in the
-    /// active flow, the <see cref="WizardStepInfo.Step"/> view and its
+    /// step list, the <see cref="WizardStepInfo.Step"/> view and its
     /// <see cref="WizardStepInfo.StepId"/>. Null when no step is visible.
     /// </summary>
     public WizardStepInfo? CurrentStep
@@ -344,8 +344,9 @@ public partial class WizardControl : Grid
             propertyChanged: OnStepsChanged);
 
     /// <summary>
-    /// Source collection of steps. Steps excluded via <see cref="WizardStep.IsStepVisible"/>
-    /// or the <see cref="StepVisibilityEvaluating"/> event are not part of the active flow.
+    /// Source collection of steps, in order. Every step counts towards the wizard's length and
+    /// keeps its index; <see cref="WizardStep.IsSkipped"/> only decides which ones navigation
+    /// passes over.
     /// </summary>
     public IList Steps
     {
@@ -386,15 +387,22 @@ public partial class WizardControl : Grid
 
     #endregion Properties
 
-    #region Flow management
+    #region Steps
 
     /// <summary>
-    /// Re-evaluates visibility of all steps. Call this after anything that
-    /// <see cref="WizardStep.IsStepVisible"/> or the <see cref="StepVisibilityEvaluating"/>
-    /// handler depends on has changed. The current step is preserved when it remains part of
-    /// the flow.
+    /// Called by a step whose <see cref="WizardStep.IsSkipped"/> changed. Only the buttons
+    /// depend on it - nothing moves in the visual tree, which is precisely why the property is
+    /// safe to bind.
     /// </summary>
-    public void RefreshStepVisibility() => SyncSteps();
+    internal void OnStepSkippedChanged()
+    {
+        if (StepsFrame is null)
+        {
+            return;
+        }
+
+        UpdateState();
+    }
 
     private bool _isSyncingSteps;
 
@@ -406,8 +414,8 @@ public partial class WizardControl : Grid
             return;
         }
 
-        // Rebuilding the flow mutates the frame's children, which is not something to start
-        // again from inside. A refresh asked for mid-rebuild is dropped rather than nested.
+        // Mirroring mutates the frame's children, which is not something to start again from
+        // inside. A sync asked for mid-sync is dropped rather than nested.
         if (_isSyncingSteps)
         {
             return;
@@ -430,50 +438,52 @@ public partial class WizardControl : Grid
         var currentIndex = StepsFrame.GetCurrentIndex();
         var currentView = currentIndex >= 0 ? StepsFrame.Children[currentIndex] as View : null;
 
-        var flow = new List<View>();
+        var steps = new List<View>();
 
         if (Steps is not null)
         {
             foreach (var item in Steps)
             {
-                if (item is View view && EvaluateStepVisibility(view))
+                if (item is View view)
                 {
-                    flow.Add(view);
+                    steps.Add(view);
                 }
             }
         }
 
-        ApplyFlow(flow);
+        MirrorSteps(steps);
 
+        // Null on the first pass, so the wizard opens on the first step whether it is skipped or
+        // not: skipping governs transitions, and opening the wizard is not one.
         StepsFrame.SetCurrent(currentView);
         UpdateState();
     }
 
     /// <summary>
-    /// Brings the frame's children in line with <paramref name="flow"/> by touching only what
-    /// actually differs.
+    /// Brings the frame's children in line with <paramref name="steps"/> by touching only what
+    /// actually differs. Skipping plays no part here - every step is hosted, always.
     /// </summary>
     /// <remarks>
     /// Deliberately not a clear-and-refill: re-parenting a step view resets state that lives in
     /// the visual tree rather than in the view itself - <c>RadioButtonGroup.SelectedValue</c>
-    /// loses its selection, focus and scroll offsets are dropped. Steps that stay in the flow
-    /// must keep their place in the tree untouched.
+    /// loses its selection, focus and scroll offsets are dropped. Only a step actually added to
+    /// or removed from <see cref="Steps"/> moves.
     /// </remarks>
-    private void ApplyFlow(List<View> flow)
+    private void MirrorSteps(List<View> steps)
     {
         var children = StepsFrame.Children;
 
         for (var i = children.Count - 1; i >= 0; i--)
         {
-            if (children[i] is not View view || !flow.Contains(view))
+            if (children[i] is not View view || !steps.Contains(view))
             {
                 children.RemoveAt(i);
             }
         }
 
-        for (var i = 0; i < flow.Count; i++)
+        for (var i = 0; i < steps.Count; i++)
         {
-            var view = flow[i];
+            var view = steps[i];
             var currentPosition = children.IndexOf(view);
 
             if (currentPosition < 0)
@@ -489,35 +499,17 @@ public partial class WizardControl : Grid
         }
     }
 
-    private bool EvaluateStepVisibility(View step)
+    /// <summary>
+    /// Index of the nearest step navigation may land on, searching from <paramref name="fromIndex"/>
+    /// in <paramref name="direction"/> (+1 forward, -1 back). -1 when there is none.
+    /// </summary>
+    private int FindNavigableStep(int fromIndex, int direction)
     {
-        // Deliberately based on WizardStep.IsStepVisible instead of View.IsVisible:
-        // IsVisible is mutated by WizardFrame while switching steps and cannot serve
-        // as the "belongs to the flow" flag.
-        var initial = step is not WizardStep wizardStep || wizardStep.IsStepVisible;
+        var children = StepsFrame.Children;
 
-        var handler = StepVisibilityEvaluating;
-
-        if (handler is null)
+        for (var i = fromIndex + direction; i >= 0 && i < children.Count; i += direction)
         {
-            return initial;
-        }
-
-        var args = new StepVisibilityEventArgs(step, IndexOfStep(step), initial);
-        handler(this, args);
-        return args.IsVisible;
-    }
-
-    private int IndexOfStep(View step)
-    {
-        if (Steps is null)
-        {
-            return -1;
-        }
-
-        for (var i = 0; i < Steps.Count; i++)
-        {
-            if (ReferenceEquals(Steps[i], step))
+            if (children[i] is View view && view is not WizardStep { IsSkipped: true })
             {
                 return i;
             }
@@ -528,7 +520,6 @@ public partial class WizardControl : Grid
 
     private void UpdateState()
     {
-        var count = StepsFrame.Children.Count;
         var index = StepsFrame.GetCurrentIndex();
         var current = StepsFrame.GetStepInfo(index);
 
@@ -536,7 +527,7 @@ public partial class WizardControl : Grid
         CurrentStep = current;
         CurrentStepTitle = (current?.Step as WizardStep)?.Title;
 
-        if (count == 0 || index < 0)
+        if (index < 0)
         {
             IsBackVisible = false;
             IsNextVisible = false;
@@ -544,9 +535,12 @@ public partial class WizardControl : Grid
             return;
         }
 
-        IsBackVisible = index > 0;
-        IsNextVisible = index < count - 1;
-        IsFinishVisible = index == count - 1;
+        IsBackVisible = FindNavigableStep(index, -1) >= 0;
+        IsNextVisible = FindNavigableStep(index, 1) >= 0;
+
+        // Finish belongs on the last step the user can actually get to, which is not necessarily
+        // the last step in the list - everything after it may be skipped.
+        IsFinishVisible = !IsNextVisible;
     }
 
     #endregion
@@ -554,22 +548,40 @@ public partial class WizardControl : Grid
     #region Navigation
 
     /// <summary>
-    /// Navigates to the next step. Returns false when cancelled or not possible.
+    /// Navigates to the next step the user may land on, passing over any
+    /// <see cref="WizardStep.IsSkipped"/> in between. Returns false when cancelled or when
+    /// nothing lies ahead.
     /// </summary>
     public Task<bool> GoNextAsync()
-        => GoToStepAsync(StepsFrame.GetCurrentIndex() + 1);
+        => GoToNavigableStepAsync(1);
 
     /// <summary>
-    /// Navigates to the previous step. Returns false when cancelled or not possible.
+    /// Navigates to the previous step the user may land on, passing over any
+    /// <see cref="WizardStep.IsSkipped"/> in between. Returns false when cancelled or when
+    /// nothing lies behind.
     /// </summary>
     public Task<bool> GoBackAsync()
-        => GoToStepAsync(StepsFrame.GetCurrentIndex() - 1);
+        => GoToNavigableStepAsync(-1);
+
+    private Task<bool> GoToNavigableStepAsync(int direction)
+    {
+        var targetIndex = FindNavigableStep(StepsFrame.GetCurrentIndex(), direction);
+
+        return targetIndex < 0
+            ? Task.FromResult(false)
+            : GoToStepAsync(targetIndex);
+    }
 
     /// <summary>
-    /// Navigates to the step at <paramref name="targetIndex"/> within the active flow.
+    /// Navigates to the step at <paramref name="targetIndex"/> in <see cref="Steps"/>.
     /// Raises the cancelable <see cref="Navigating"/> event first and, when a handler took a
     /// deferral, waits for it before acting on the outcome.
     /// </summary>
+    /// <remarks>
+    /// A jump is taken at its word: unlike <see cref="GoNextAsync"/> and <see cref="GoBackAsync"/>,
+    /// this goes to a <see cref="WizardStep.IsSkipped"/> step too. Asking for a specific step is
+    /// deliberate, so the wizard does not second-guess it.
+    /// </remarks>
     public async Task<bool> GoToStepAsync(int targetIndex)
     {
         // A deferred handler can keep the wizard waiting for a while; further requests in the
@@ -609,9 +621,8 @@ public partial class WizardControl : Grid
 
     /// <summary>
     /// Navigates to the step whose <see cref="WizardStep.StepId"/> matches <paramref name="stepId"/>
-    /// (ordinal comparison). Returns false when no step in the active flow carries that identifier -
-    /// note that steps excluded via <see cref="WizardStep.IsStepVisible"/> or
-    /// <see cref="StepVisibilityEvaluating"/> are not part of the flow and cannot be navigated to.
+    /// (ordinal comparison). Returns false when no step carries that identifier. Skipped steps are
+    /// reachable this way, for the reason given on <see cref="GoToStepAsync(int)"/>.
     /// </summary>
     public Task<bool> GoToStepAsync(string stepId)
     {
@@ -623,7 +634,7 @@ public partial class WizardControl : Grid
     }
 
     /// <summary>
-    /// Returns the index of the step with the given identifier within the active flow, or -1.
+    /// Returns the index of the step with the given identifier, or -1.
     /// </summary>
     private int IndexOfStepId(string stepId)
     {

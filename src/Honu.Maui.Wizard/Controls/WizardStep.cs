@@ -5,7 +5,7 @@ namespace Honu.Maui.Wizard;
 /// <summary>
 /// A single step of a <see cref="WizardControl"/>. Any <see cref="View"/> can act as a step;
 /// this class adds wizard-specific metadata (<see cref="StepId"/>, <see cref="Title"/>,
-/// <see cref="IsStepVisible"/>).
+/// <see cref="IsSkipped"/>).
 /// </summary>
 public class WizardStep : ContentView
 {
@@ -19,9 +19,9 @@ public class WizardStep : ContentView
             default(string));
 
     /// <summary>
-    /// Stable identifier of the step, independent of its position in the flow. Lets consumers
-    /// recognise a step in <see cref="WizardNavigatingEventArgs"/> without relying on indexes,
-    /// which shift as steps are added, removed or hidden via <see cref="IsStepVisible"/>.
+    /// Stable identifier of the step, independent of its position. Lets consumers recognise a
+    /// step in <see cref="WizardNavigatingEventArgs"/> without relying on indexes, which shift
+    /// as steps are added to or removed from <see cref="WizardControl.Steps"/>.
     /// </summary>
     public string? StepId
     {
@@ -51,33 +51,59 @@ public class WizardStep : ContentView
 
     #endregion
 
-    #region IsStepVisible (bool)
+    #region IsSkipped (bool)
 
-    public static readonly BindableProperty IsStepVisibleProperty =
+    public static readonly BindableProperty IsSkippedProperty =
         BindableProperty.Create(
-            nameof(IsStepVisible),
+            nameof(IsSkipped),
             typeof(bool),
             typeof(WizardStep),
-            true);
+            false,
+            propertyChanged: OnIsSkippedChanged);
 
     /// <summary>
-    /// Whether this step is part of the wizard flow. Deliberately separate from
-    /// <see cref="VisualElement.IsVisible"/>, which the wizard mutates while switching steps.
+    /// Whether <see cref="WizardControl.GoNextAsync"/> and <see cref="WizardControl.GoBackAsync"/>
+    /// pass over this step.
     /// </summary>
     /// <remarks>
-    /// Set this in XAML for a step that starts out excluded, and call
-    /// <see cref="WizardControl.RefreshStepVisibility"/> after changing it at runtime.
+    /// Affects transitions and nothing else. The step keeps its place in
+    /// <see cref="WizardControl.Steps"/> and its index, so the wizard's length and every step's
+    /// position stay the same however the flags move - which is what makes a progress indicator
+    /// possible. Nothing is added to or removed from the visual tree either, so this is safe to
+    /// bind: the step never loses its binding context.
     /// <para>
-    /// Do not bind it. A step outside the flow is not in the visual tree, so it has no binding
-    /// context and the binding would fall back to this property's default of true - putting the
-    /// step back into the flow, where the binding resolves to false again. Drive a conditional
-    /// step from <see cref="WizardControl.StepVisibilityEvaluating"/> instead.
+    /// A skipped step is not hidden. <see cref="WizardControl.GoToStepAsync(int)"/> still goes
+    /// there when asked, and a step skipped while the user is standing on it stays on screen
+    /// until they navigate away.
     /// </para>
     /// </remarks>
-    public bool IsStepVisible
+    public bool IsSkipped
     {
-        get => (bool)GetValue(IsStepVisibleProperty);
-        set => SetValue(IsStepVisibleProperty, value);
+        get => (bool)GetValue(IsSkippedProperty);
+        set => SetValue(IsSkippedProperty, value);
+    }
+
+    private static void OnIsSkippedChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        // Only the Back/Next/Finish buttons depend on this; nothing is restructured.
+        (bindable as WizardStep)?.FindOwner()?.OnStepSkippedChanged();
+    }
+
+    /// <summary>
+    /// Walks up to the <see cref="WizardControl"/> hosting this step, or null when the step is
+    /// not part of one.
+    /// </summary>
+    private WizardControl? FindOwner()
+    {
+        for (Element? element = Parent; element is not null; element = element.Parent)
+        {
+            if (element is WizardControl control)
+            {
+                return control;
+            }
+        }
+
+        return null;
     }
 
     #endregion

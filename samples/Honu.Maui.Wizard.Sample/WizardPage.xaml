@@ -11,9 +11,9 @@
 
     <!--
         Every step demonstrates a different family of input controls and carries its own gate.
-        The view model gates navigation through NavigatingCommand and closes the wizard through
-        FinishCommand; the one thing left in code-behind is the conditional step, because
-        IsStepVisible cannot be bound - see WizardStep.IsStepVisible.
+        The view model gates navigation through NavigatingCommand, closes the wizard through
+        FinishCommand and skips the conditional step through IsSkipped - there is no code-behind
+        at all.
 
         The button captions are set explicitly to show they are localizable; "Continue" instead
         of the default "Next" makes that visible.
@@ -27,8 +27,7 @@
             ShowStepTitle="True"
             IsFinishEnabled="{Binding IsFinishEnabled}"
             NavigatingCommand="{Binding NavigatingCommand}"
-            FinishCommand="{Binding FinishCommand}"
-            StepVisibilityEvaluating="OnStepVisibilityEvaluating">
+            FinishCommand="{Binding FinishCommand}">
             <honu:WizardControl.Steps>
 
             <!-- 1. Intro - text only, no gate. -->
@@ -206,11 +205,11 @@
                 </ScrollView>
             </honu:WizardStep>
 
-            <!-- 5. Slider + Stepper. Conditional step, see OnStepVisibilityEvaluating. -->
+            <!-- 5. Slider + Stepper. Conditional step - one binding is the whole mechanism. -->
             <honu:WizardStep
                 StepId="advanced"
                 Title="Advanced"
-                IsStepVisible="False">
+                IsSkipped="{Binding SkipAdvanced}">
                 <ScrollView>
                     <VerticalStackLayout Padding="16" Spacing="16">
                         <VerticalStackLayout Spacing="4">

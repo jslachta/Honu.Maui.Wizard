@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<resources>
+
+    <!--
+        Workaround for a crash at startup, not styling.
+
+        MAUI's Android theme points bottomNavigationViewStyle at Widget.Design.BottomNavigationView,
+        a style from the old Design library. Material Components 1.12 runs NavigationBarView through
+        ThemeEnforcement, which rejects that style for not carrying a valid TextAppearance, so Shell
+        throws in ShellItemRenderer.OnCreateView before a single page is shown:
+
+            java.lang.IllegalArgumentException: This component requires that you specify a valid
+            TextAppearance attribute. Update your app theme to inherit from Theme.MaterialComponents
+
+        Overriding the style by name is enough: application resources win over the ones merged in
+        from libraries, so the theme keeps pointing at this name and now resolves to the Material
+        Components style. The theme itself is left alone - redeclaring it would mean copying the
+        thirteen items MAUI puts in Maui.MainTheme.Base, which would drift on the next update. The
+        parent stays on the Material 2 family because the app theme is Theme.MaterialComponents.
+
+        This lives in the sample. The library ships no Android resources at all.
+    -->
+    <style
+        name="Widget.Design.BottomNavigationView"
+        parent="Widget.MaterialComponents.BottomNavigationView" />
+
+</resources>
