@@ -110,12 +110,22 @@
 								and '$(IsTagBuild)' != 'true'">$([MSBuild]::Add($(CommitsSinceTag), 1000))</BuildNumber>
 
 			<!--
+				Patch, pod který se řadí previews.
+
+				Po stabilním vydání (patch > 0) míří další preview na NÁSLEDUJÍCÍ patch, aby se
+				neřadilo pod už vydanou verzi: 10.0.1 < 10.0.2-preview.1 < 10.0.2. Na vývojové
+				řadě (patch == 0) se neinkrementuje, tam previews sedí přímo na patchi z tagu.
+			-->
+			<PreviewPatch>$(GitBaseVersionPatch)</PreviewPatch>
+			<PreviewPatch Condition="'$(GitBaseVersionPatch)' != '0' and '$(CommitsSinceTag)' != '0'">$([MSBuild]::Add($(GitBaseVersionPatch), 1))</PreviewPatch>
+
+			<!--
 				POZOR: hodnota property musí být na jednom řádku. MSBuild whitespace v hodnotě
 				neořezává, takže víceřádkový zápis vyrobí verzi s odřádkováním a tabulátory.
 			-->
 
 			<!-- Verze snapshotu na ostatních větvích: major.minor.patch.BuildNumber-Branch.Commit -->
-			<Version>$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch).$(BuildNumber)-$(BranchCustom).$(CiCommit)</Version>
+			<Version>$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(PreviewPatch).$(BuildNumber)-$(BranchCustom).$(CiCommit)</Version>
 
 			<!--
 				Patch v tagu rozhoduje, o jaký druh vydání jde:
@@ -127,16 +137,16 @@
 				10.0.0-preview.0 (otevření vývojové řady), tag v10.0.1 vyrobí stabilní 10.0.1.
 
 				Preview se řadí pod stabilní verzi téhož čísla (10.0.0-preview.8 < 10.0.0),
-				proto se na patchi 0 stabilní verze nikdy nevydává. Po stabilním vydání je
-				potřeba otevřít další vývojovou řadu tagem s patchem 0 (v10.1.0), jinak by se
-				následující previews řadily pod právě vydanou verzi.
+				proto se na patchi 0 stabilní verze nikdy nevydává. Previews po stabilním
+				vydání míří na následující patch (viz PreviewPatch výše), takže se řadí nad
+				právě vydanou verzi a žádný další tag k otevření řady není potřeba.
 			-->
 
 			<!-- Preview: vývojová řada, nebo cokoli netagovaného na main/release -->
 			<Version Condition="( ('$(IsMainBranch)' == 'true'
 								or '$(IsReleaseBranch)' == 'true'
 								or '$(IsTagBuild)' == 'true')
-								and ('$(GitBaseVersionPatch)' == '0' or '$(CommitsSinceTag)' != '0') )">$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)-preview.$(CommitsSinceTag)</Version>
+								and ('$(GitBaseVersionPatch)' == '0' or '$(CommitsSinceTag)' != '0') )">$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(PreviewPatch)-preview.$(CommitsSinceTag)</Version>
 
 			<!-- Stabilní vydání: tag s patchem > 0, přesně na tagu -->
 			<Version Condition="( ('$(IsMainBranch)' == 'true'
