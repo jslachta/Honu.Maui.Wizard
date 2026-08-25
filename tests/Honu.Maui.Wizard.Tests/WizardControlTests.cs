@@ -87,172 +87,218 @@ public class WizardControlTests
 
     #endregion
 
-    #region Conditional visibility
+    #region Skipping
+
+    /// <summary>
+    /// The point of skipping rather than removing: indexes do not shift, so a progress
+    /// indicator can be built on them.
+    /// </summary>
+    [Fact]
+    public async Task SkippedStep_DoesNotShiftTheIndexesAroundIt()
+    {
+        var skipped = new WizardStep { StepId = "b" };
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            skipped,
+            new WizardStep { StepId = "c" });
+
+        await control.GoToStepAsync("c");
+        Assert.Equal(2, control.CurrentStepIndex);
+
+        skipped.IsSkipped = true;
+
+        // "c" is still the third step, not the second.
+        Assert.Equal(2, control.CurrentStepIndex);
+    }
 
     [Fact]
-    public void StepWithIsStepVisibleFalse_IsExcludedFromFlow()
+    public async Task GoNextAsync_StepsOverASkippedStep()
     {
         var control = CreateControl(
             new WizardStep { StepId = "a" },
-            new WizardStep { StepId = "b", IsStepVisible = false });
+            new WizardStep { StepId = "b", IsSkipped = true },
+            new WizardStep { StepId = "c" });
 
-        // Only one step is left, so the first one is also the last.
+        Assert.True(await control.GoNextAsync());
+
+        Assert.Equal("c", control.CurrentStep?.StepId);
+        Assert.Equal(2, control.CurrentStepIndex);
+    }
+
+    [Fact]
+    public async Task GoNextAsync_StepsOverSeveralSkippedStepsInARow()
+    {
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "b", IsSkipped = true },
+            new WizardStep { StepId = "c", IsSkipped = true },
+            new WizardStep { StepId = "d" });
+
+        Assert.True(await control.GoNextAsync());
+
+        Assert.Equal("d", control.CurrentStep?.StepId);
+    }
+
+    [Fact]
+    public async Task GoBackAsync_StepsOverASkippedStep()
+    {
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "b", IsSkipped = true },
+            new WizardStep { StepId = "c" });
+
+        await control.GoNextAsync();
+        Assert.True(await control.GoBackAsync());
+
+        Assert.Equal("a", control.CurrentStep?.StepId);
+    }
+
+    [Fact]
+    public void TrailingSkippedSteps_PutFinishOnTheLastReachableStep()
+    {
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "b", IsSkipped = true });
+
+        // Nothing lies ahead that can be reached, so this is where the wizard ends.
         Assert.True(control.IsFinishVisible);
         Assert.False(control.IsNextVisible);
     }
 
     [Fact]
-    public void StepVisibilityEvaluating_CanExcludeAStep()
+    public void LeadingSkippedSteps_HideBackOnTheFirstReachableStep()
     {
-        var control = new WizardControl();
-        control.StepVisibilityEvaluating += (_, e) =>
-        {
-            if ((e.Step as WizardStep)?.StepId == "b")
-            {
-                e.IsVisible = false;
-            }
-        };
+        var control = CreateControl(
+            new WizardStep { StepId = "a", IsSkipped = true },
+            new WizardStep { StepId = "b" },
+            new WizardStep { StepId = "c" });
 
-        control.Steps.Add(new WizardStep { StepId = "a" });
-        control.Steps.Add(new WizardStep { StepId = "b" });
-
-        Assert.True(control.IsFinishVisible);
+        // The wizard opens on the first step whatever its flag says; skipping governs
+        // transitions, and opening is not one.
+        Assert.Equal(0, control.CurrentStepIndex);
+        Assert.False(control.IsBackVisible);
     }
 
     [Fact]
-    public void StepVisibilityEvaluating_CanIncludeAnOtherwiseHiddenStep()
+    public async Task SkippingAStepAhead_MovesFinishWithoutTouchingTheCurrentStep()
     {
-        var control = new WizardControl();
-        control.StepVisibilityEvaluating += (_, e) => e.IsVisible = true;
+        var last = new WizardStep { StepId = "c" };
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "b" },
+            last);
 
-        control.Steps.Add(new WizardStep { StepId = "a" });
-        control.Steps.Add(new WizardStep { StepId = "b", IsStepVisible = false });
-
+        await control.GoNextAsync();
         Assert.True(control.IsNextVisible);
         Assert.False(control.IsFinishVisible);
+
+        last.IsSkipped = true;
+
+        Assert.False(control.IsNextVisible);
+        Assert.True(control.IsFinishVisible);
+        Assert.Equal("b", control.CurrentStep?.StepId);
     }
 
     /// <summary>
-    /// Changing <see cref="WizardStep.IsStepVisible"/> is not picked up on its own - the
-    /// consumer has to ask for a refresh. Watching the property would mean rebuilding the flow
-    /// from inside a property-changed callback, which is exactly what deadlocked the control
-    /// when the change arrived during MAUI's binding-context propagation.
+    /// Skipping the step the user is standing on does not move them: the wizard would otherwise
+    /// jump under their feet. They leave it on the next navigation like any other step.
     /// </summary>
     [Fact]
-    public void ChangingIsStepVisible_WithoutARefresh_LeavesTheFlowAlone()
-    {
-        var toggled = new WizardStep { StepId = "b", IsStepVisible = false };
-        var control = CreateControl(new WizardStep { StepId = "a" }, toggled);
-
-        Assert.True(control.IsFinishVisible);
-
-        toggled.IsStepVisible = true;
-
-        Assert.True(control.IsFinishVisible);
-        Assert.False(control.IsNextVisible);
-    }
-
-    [Fact]
-    public async Task RefreshStepVisibility_PicksUpAStepAddedLater()
-    {
-        var control = CreateControl(new WizardStep { StepId = "a" });
-        var added = new WizardStep { StepId = "b", IsStepVisible = false };
-
-        control.Steps.Add(added);
-        Assert.True(control.IsFinishVisible);
-
-        added.IsStepVisible = true;
-        control.RefreshStepVisibility();
-
-        Assert.True(await control.GoToStepAsync("b"));
-    }
-
-    [Fact]
-    public void RemovedStep_NoLongerAffectsTheFlow()
-    {
-        var removed = new WizardStep { StepId = "b" };
-        var control = CreateControl(new WizardStep { StepId = "a" }, removed);
-
-        control.Steps.Remove(removed);
-        Assert.True(control.IsFinishVisible);
-
-        removed.IsStepVisible = false;
-        control.RefreshStepVisibility();
-
-        Assert.True(control.IsFinishVisible);
-        Assert.False(control.IsNextVisible);
-    }
-
-    [Fact]
-    public void RefreshStepVisibility_PicksUpChangedIsStepVisible()
-    {
-        var toggled = new WizardStep { StepId = "b", IsStepVisible = false };
-        var control = CreateControl(new WizardStep { StepId = "a" }, toggled);
-
-        Assert.True(control.IsFinishVisible);
-
-        toggled.IsStepVisible = true;
-        control.RefreshStepVisibility();
-
-        Assert.True(control.IsNextVisible);
-        Assert.False(control.IsFinishVisible);
-    }
-
-    [Fact]
-    public async Task RefreshStepVisibility_KeepsTheCurrentStep()
+    public async Task SkippingTheCurrentStep_LeavesTheUserOnIt()
     {
         var second = new WizardStep { StepId = "b" };
         var control = CreateControl(
             new WizardStep { StepId = "a" },
             second,
-            new WizardStep { StepId = "c", IsStepVisible = false });
+            new WizardStep { StepId = "c" });
 
         await control.GoNextAsync();
-        Assert.Equal("b", control.CurrentStep?.StepId);
 
-        control.RefreshStepVisibility();
+        second.IsSkipped = true;
 
         Assert.Equal("b", control.CurrentStep?.StepId);
-        Assert.Same(second, control.CurrentStep?.Step);
+        Assert.True(control.IsBackVisible);
+        Assert.True(control.IsNextVisible);
+    }
+
+    [Fact]
+    public void EveryStepSkipped_LeavesTheFirstStepShowingWithFinishOnly()
+    {
+        var control = CreateControl(
+            new WizardStep { StepId = "a", IsSkipped = true },
+            new WizardStep { StepId = "b", IsSkipped = true });
+
+        Assert.Equal("a", control.CurrentStep?.StepId);
+        Assert.False(control.IsBackVisible);
+        Assert.False(control.IsNextVisible);
+        Assert.True(control.IsFinishVisible);
     }
 
     /// <summary>
-    /// Regression: <c>SyncSteps</c> used to clear and refill the frame, re-parenting every step.
-    /// That silently reset state living in the visual tree rather than on the view - most
-    /// visibly <c>RadioButtonGroup.SelectedValue</c>, which dropped the user's choice.
+    /// Nothing is added to or removed from the visual tree when a flag changes - which is what
+    /// makes the property safe to bind, and preserves state living in the tree rather than on
+    /// the view, such as <c>RadioButtonGroup.SelectedValue</c>.
     /// </summary>
     [Fact]
-    public void RefreshStepVisibility_DoesNotReparentStepsThatStayInTheFlow()
+    public void ChangingIsSkipped_NeverReparentsAnything()
     {
         var kept = new WizardStep { StepId = "kept" };
-        var toggled = new WizardStep { StepId = "toggled", IsStepVisible = false };
+        var toggled = new WizardStep { StepId = "toggled" };
         var control = CreateControl(kept, toggled);
 
         var reparentCount = 0;
         kept.ParentChanged += (_, _) => reparentCount++;
+        toggled.ParentChanged += (_, _) => reparentCount++;
 
-        toggled.IsStepVisible = true;
-        control.RefreshStepVisibility();
-
-        toggled.IsStepVisible = false;
-        control.RefreshStepVisibility();
+        toggled.IsSkipped = true;
+        toggled.IsSkipped = false;
 
         Assert.Equal(0, reparentCount);
     }
 
+    #endregion
+
+    #region Deliberate jumps
+
+    /// <summary>
+    /// Next and Back pass over a skipped step, but asking for one by name is a deliberate act
+    /// and the wizard takes it at its word.
+    /// </summary>
     [Fact]
-    public void RefreshStepVisibility_ReparentsOnlyTheStepThatEntersTheFlow()
+    public async Task GoToStepAsync_ById_ReachesASkippedStep()
     {
-        var toggled = new WizardStep { StepId = "toggled", IsStepVisible = false };
-        var control = CreateControl(new WizardStep { StepId = "kept" }, toggled);
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "skipped", IsSkipped = true },
+            new WizardStep { StepId = "c" });
 
-        var reparentCount = 0;
-        toggled.ParentChanged += (_, _) => reparentCount++;
+        Assert.True(await control.GoToStepAsync("skipped"));
+        Assert.Equal("skipped", control.CurrentStep?.StepId);
+    }
 
-        toggled.IsStepVisible = true;
-        control.RefreshStepVisibility();
+    [Fact]
+    public async Task GoToStepAsync_ByIndex_ReachesASkippedStep()
+    {
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "skipped", IsSkipped = true });
 
-        Assert.Equal(1, reparentCount);
+        Assert.True(await control.GoToStepAsync(1));
+        Assert.Equal("skipped", control.CurrentStep?.StepId);
+    }
+
+    [Fact]
+    public async Task NavigationFromASkippedStep_ResumesTheNormalRules()
+    {
+        var control = CreateControl(
+            new WizardStep { StepId = "a" },
+            new WizardStep { StepId = "skipped", IsSkipped = true },
+            new WizardStep { StepId = "c" });
+
+        await control.GoToStepAsync("skipped");
+
+        Assert.True(await control.GoNextAsync());
+        Assert.Equal("c", control.CurrentStep?.StepId);
     }
 
     #endregion
@@ -380,16 +426,6 @@ public class WizardControlTests
 
         Assert.False(await control.GoToStepAsync(stepId));
         Assert.Equal("a", control.CurrentStep?.StepId);
-    }
-
-    [Fact]
-    public async Task GoToStepAsync_ById_IgnoresStepsOutsideTheFlow()
-    {
-        var control = CreateControl(
-            new WizardStep { StepId = "a" },
-            new WizardStep { StepId = "hidden", IsStepVisible = false });
-
-        Assert.False(await control.GoToStepAsync("hidden"));
     }
 
     [Fact]

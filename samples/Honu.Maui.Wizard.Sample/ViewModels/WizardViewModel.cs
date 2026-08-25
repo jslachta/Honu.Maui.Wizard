@@ -457,8 +457,8 @@ public sealed class WizardViewModel : ObservableObject
     private bool _showAdvanced;
 
     /// <summary>
-    /// Bound straight to <c>WizardStep.IsStepVisible</c> of the advanced step, which is all it
-    /// takes to add or remove that step from the flow.
+    /// What the switch on the notifications step drives, and what the rest of this view model
+    /// reasons about.
     /// </summary>
     public bool ShowAdvanced
     {
@@ -467,11 +467,22 @@ public sealed class WizardViewModel : ObservableObject
         {
             if (SetProperty(ref _showAdvanced, value))
             {
+                OnPropertyChanged(nameof(SkipAdvanced));
                 RaiseValidation(nameof(AdvancedError), nameof(HasAdvancedError));
                 RaiseSummaryChanged();
             }
         }
     }
+
+    /// <summary>
+    /// Bound straight to <c>WizardStep.IsSkipped</c> of the advanced step, which is all it takes
+    /// to make the wizard step over it.
+    /// </summary>
+    /// <remarks>
+    /// The inversion lives here rather than in the view: a view model says what it means
+    /// ("show the advanced step"), and adapts to the control's vocabulary at the boundary.
+    /// </remarks>
+    public bool SkipAdvanced => !ShowAdvanced;
 
     #endregion
 

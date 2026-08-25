@@ -58,7 +58,7 @@ The tests run on the plain `net10.0` target - no emulator, no app host. Two thin
 work: a `DispatcherStub` installed from a module initializer (MAUI needs a dispatcher as soon
 as a bindable property change reaches a binding), and the absence of a layout pass, which keeps
 `Width` at -1 so `WizardFrame` takes its non-animated path. The tests therefore cover the flow
-bookkeeping - step visibility, indexes, navigation, event payloads - and not rendering.
+bookkeeping - skipping, indexes, navigation, event payloads - and not rendering.
 
 ## Sample
 
@@ -71,7 +71,7 @@ each with a different flavour of gate:
 | Environment | `server` | `CollectionView` + conditional `Entry`, `Switch` | selection required; picking *Custom address* reveals a URL entry that must parse as an absolute http(s) address - then an **awaited** reachability check runs before the step may be left |
 | Appearance | `appearance` | `RadioButtonGroup`, `Picker` | both must be chosen |
 | Notifications | `notifications` | `Switch` ×3, `CheckBox` | consent required **only when** notifications are on |
-| Advanced | `advanced` | `Slider` (with live preview), `Stepper` | **conditional step** - `StepVisibilityEvaluating` keys off the switch above; cross-field rule between font size and page size |
+| Advanced | `advanced` | `Slider` (with live preview), `Stepper` | **conditional step** - `IsSkipped` is bound to the switch above; cross-field rule between font size and page size |
 | Topics | `topics` | `BindableLayout` + `CheckBox` | at least two selected |
 | Profile | `profile` | `Entry`, `Editor`, `DatePicker`, `TimePicker` | name length, minimum text length, date must be in the past |
 | Summary | `summary` | `CheckBox` | `IsFinishEnabled` keeps Finish disabled until confirmed |
@@ -84,8 +84,11 @@ The server step goes one further and awaits a simulated reachability probe throu
 with a spinner bound to `IsNavigating`. A *Simulate an unreachable server* switch is there so
 the rejection path can be triggered on purpose rather than only being described.
 
-Navigation and Finish are bindings on the view model; the only thing left in
-`WizardPage.xaml.cs` is the conditional step, which needs the `StepVisibilityEvaluating` event.
+Navigation, Finish and the conditional step are all bindings on the view model, so
+`WizardPage.xaml.cs` holds nothing but `InitializeComponent()` and the binding context. The view
+model keeps its own positive vocabulary (`ShowAdvanced`, driven by the switch) and exposes
+`SkipAdvanced => !ShowAdvanced` for the step to bind to - the inversion belongs at the boundary,
+not in the view.
 
 ## Usage
 
@@ -100,8 +103,8 @@ xmlns:honu="http://schemas.slachta.eu/honu/maui"
         <honu:WizardStep StepId="welcome" Title="Welcome">
             <!-- any content -->
         </honu:WizardStep>
-        <honu:WizardStep StepId="details" Title="Details" IsStepVisible="False">
-            <!-- conditional step, enable via IsStepVisible + RefreshStepVisibility() -->
+        <honu:WizardStep StepId="details" Title="Details" IsSkipped="{Binding SkipDetails}">
+            <!-- conditional step: Next and Back pass over it while the binding says so -->
         </honu:WizardStep>
         <honu:WizardStep StepId="summary" Title="Summary">
             <!-- ... -->
@@ -130,37 +133,46 @@ builder.UseMauiApp<App>().UseHonuWizard();
 | `BackText`, `NextText`, `FinishText` | Button captions (localization). |
 | `FinishCommand`, `FinishCommandParameter`, `IsFinishEnabled` | Finish button wiring. |
 | `ShowStepTitle`, `CurrentStepTitle` | Optional header with the current `WizardStep.Title`. |
-| `CurrentStep` (`WizardStepInfo`), `CurrentStepIndex` | Read-only state of the active flow. |
+| `CurrentStep` (`WizardStepInfo`), `CurrentStepIndex` | Read-only position within `Steps`, skipped steps included. |
 | `TransitionDuration` | Slide animation length in ms; `0` disables animation. |
-| `GoNextAsync()`, `GoBackAsync()` | Programmatic navigation. |
-| `GoToStepAsync(int)`, `GoToStepAsync(string)` | Jump to a step by index or by `StepId`. |
-| `RefreshStepVisibility()` | Rebuilds the flow after visibility conditions change. |
+| `GoNextAsync()`, `GoBackAsync()` | Programmatic navigation, passing over skipped steps. |
+| `GoToStepAsync(int)`, `GoToStepAsync(string)` | Deliberate jump by index or `StepId`; reaches skipped steps too. |
 | `Navigating` (cancelable, deferrable) | Per-step validation hook, sync or async. |
 | `NavigatingCommand` | Same hook as an `ICommand`, for view models without code-behind. |
 | `IsNavigating` | True while a navigation is in flight, deferrals included. |
-| `StepChanged`, `Finished`, `StepVisibilityEvaluating` | Lifecycle events. |
+| `StepChanged`, `Finished` | Lifecycle events. |
 
 ### `WizardStep`
 
-`ContentView` with `StepId`, `Title` and `IsStepVisible`. `IsStepVisible` expresses "belongs to
-the flow" and is deliberately separate from `VisualElement.IsVisible`, which the wizard mutates
-while switching steps.
+`ContentView` with `StepId`, `Title` and `IsSkipped`. `IsSkipped` says whether Next and Back pass
+over the step; it is deliberately separate from `VisualElement.IsVisible`, which the wizard owns
+and mutates while switching steps.
 
 `StepId` is a stable identifier that survives reordering and conditional steps - prefer it over
 indexes when reacting to navigation.
 
-**`IsStepVisible` cannot be bound.** A step outside the flow is not in the visual tree, so it
-has no binding context; the binding falls back to the property's default of `true`, which puts
-the step back into the flow, where it resolves to `false` again. Drive conditional steps from
-`StepVisibilityEvaluating` and call `RefreshStepVisibility()` when the condition changes:
+`IsSkipped` is bindable and needs nothing else - no event, no refresh call, no code-behind:
 
-```csharp
-wizard.StepVisibilityEvaluating += (s, e) =>
-{
-    if ((e.Step as WizardStep)?.StepId == "advanced")
-        e.IsVisible = viewModel.ShowAdvanced;
-};
+```xml
+<honu:WizardStep StepId="advanced" Title="Advanced" IsSkipped="{Binding SkipAdvanced}" />
 ```
+
+It is bindable precisely because **nothing moves**. Changing it recomputes which buttons show
+and stops there; the step keeps its place in the visual tree, so it never loses the binding
+context the flag itself is coming from. That also preserves state living in the tree rather
+than on the view, such as `RadioButtonGroup.SelectedValue`, focus and scroll offsets.
+
+A skipped step is not a hidden step:
+
+- it keeps its index, and the wizard keeps its length - which is what makes a progress
+  indicator possible, since the numbers do not move under you
+- `GoToStepAsync` still goes there when asked; only `GoNextAsync` and `GoBackAsync` pass over it
+- skipping the step the user is standing on leaves them there, so nothing jumps under their
+  feet; they leave it on the next navigation like any other step
+
+The wizard opens on the first step whatever its flag says - skipping governs transitions, and
+opening the wizard is not one. Finish appears on the last step that can be reached, which is not
+necessarily the last in the list.
 
 ### `WizardStepInfo`
 
@@ -250,6 +262,41 @@ The low-level step host (stacked children, one visible, slide transitions). Usab
 via `ForwardAsync()`, `BackwardAsync()`, `GoToAsync(int)`, `GetCurrentIndex()`,
 `GetStepInfo(int)` and the `StepChanged` event.
 
+## Versioning
+
+The major version tracks .NET MAUI, not this library's API - `10.x` targets MAUI 10. That leaves
+no major version of our own to spend, so **breaking changes land on minor releases** and are
+spelled out here and in the release notes. Pin the minor if that matters to you.
+
+### 10.0.x → 10.1.0
+
+Conditional steps stopped being a visibility question and became a navigation one. A step is
+never removed from the wizard; it is stepped over. That makes the flag bindable (nothing moves in
+the visual tree, so no binding context is ever lost) and it keeps every index and the wizard's
+length fixed, which is what a progress indicator needs.
+
+| 10.0.x | 10.1.0 |
+| --- | --- |
+| `WizardStep.IsStepVisible` | `WizardStep.IsSkipped` — **note the inverted meaning** |
+| `WizardControl.RefreshStepVisibility()` | removed - changing `IsSkipped` is enough |
+| `WizardControl.StepVisibilityEvaluating` | removed - bind `IsSkipped` instead |
+| `StepVisibilityEventArgs` | removed |
+
+⚠️ **`IsStepVisible` → `IsSkipped` is a negation, not a rename.** `IsStepVisible="False"` must
+become `IsSkipped="True"`. A blind find-and-replace inverts the behaviour of every conditional
+step. The compiler catches the name, not the polarity - that part is on you.
+
+⚠️ **`CurrentStepIndex` and `WizardStepInfo.Index` changed meaning silently.** They used to index
+the active flow, with excluded steps closing the gap; they now index `Steps` in full, skipped
+steps included. Nothing fails to compile - the numbers are simply different. This is the only
+change in this release that does not announce itself, so audit anything that does arithmetic on
+step indexes.
+
+Behaviour worth knowing, all of it new rather than changed: the wizard opens on the first step
+whatever its flag says; skipping the step the user is on leaves them there until they navigate;
+`GoToStepAsync` reaches skipped steps while `GoNextAsync`/`GoBackAsync` pass over them; and
+Finish appears on the last *reachable* step, which may not be the last in the list.
+
 ## Credits
 
 This control began as an extension of Redth's post
@@ -267,8 +314,8 @@ What this library adds on top of that starting point:
   indexes that shift when steps are added, removed or conditionally hidden.
 - `WizardStepInfo` - every endpoint the control hands out (`Navigating`, `StepChanged`,
   `CurrentStep`) carries index, view and id together.
-- Conditional steps via `WizardStep.IsStepVisible` and the `StepVisibilityEvaluating` event,
-  plus `RefreshStepVisibility()` to rebuild the flow while preserving the current step.
+- Conditional steps via the bindable `WizardStep.IsSkipped`, which changes navigation only -
+  indexes and wizard length stay put, so a progress indicator has stable numbers.
 - Cancelable `Navigating` for per-step validation, and `GoToStepAsync(string stepId)`.
 - Read-only flow state (`CurrentStep`, `CurrentStepIndex`, `CurrentStepTitle`,
   `IsBackVisible` / `IsNextVisible` / `IsFinishVisible`) for binding.

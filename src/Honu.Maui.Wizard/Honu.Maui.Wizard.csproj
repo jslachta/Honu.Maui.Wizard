@@ -16,6 +16,16 @@
 		<Description>A multi-step wizard control for .NET MAUI (iOS, Android). Works both with and without Shell.</Description>
 		<PackageTags>maui;wizard;stepper;control;ios;android</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReleaseNotes>
+			10.1.0 - conditional steps are a navigation concern now, not a visibility one: a step is
+			stepped over rather than removed, so it keeps its index and the wizard keeps its length.
+			BREAKING. IsStepVisible -&gt; IsSkipped, and this is a NEGATION, not a rename:
+			IsStepVisible="False" becomes IsSkipped="True". StepVisibilityEvaluating,
+			StepVisibilityEventArgs and RefreshStepVisibility() are removed - bind IsSkipped, which
+			is safe to bind because nothing moves in the visual tree. Also silent: CurrentStepIndex
+			and WizardStepInfo.Index now index Steps in full, skipped steps included, where they used
+			to index the active flow. See the README for the migration table.
+		</PackageReleaseNotes>
 		<RepositoryUrl>https://github.com/jslachta/Honu.Maui.Wizard</RepositoryUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
