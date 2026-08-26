@@ -1,5 +1,8 @@
 # Honu.Maui.Wizard
 
+[![NuGet](https://img.shields.io/nuget/v/Honu.Maui.Wizard.svg)](https://www.nuget.org/packages/Honu.Maui.Wizard/) 
+[![NuGet](https://img.shields.io/nuget/dt/Honu.Maui.Wizard.svg)](https://www.nuget.org/packages/Honu.Maui.Wizard/)
+
 A multi-step wizard control for .NET MAUI (**.NET 10**, iOS + Android). The control is a plain
 `View`, so it works identically with and without Shell; the sample in `samples/` runs it as the
 app's Shell root.
