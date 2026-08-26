@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a capability the control does not have.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before you write: `Steps` is deliberately an `IList` of already-realized
+        `View`s - a data-driven step source (`ItemsSource` + `DataTemplate`) is out of scope
+        for now, not an oversight. The project also prefers a breaking change in a later major
+        version over shaping the API pre-emptively, so "add this now so it will not break
+        later" is not on its own a reason.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: |
+        What are you trying to build, and where does the control get in the way? Describe the
+        situation rather than the API you have in mind - the shape of the solution comes after.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do today
+      description: The workaround you are living with, and what it costs. "Nothing works" is a valid answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: How it might look
+      description: Optional. Sketch the XAML or the API surface if you already have one in mind.
+      render: xml
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to open a PR for this.

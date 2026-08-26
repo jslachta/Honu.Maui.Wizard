@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question about using the control
+    url: https://github.com/jslachta/Honu.Maui.Wizard/discussions
+    about: How-to questions and design discussion go to Discussions, not the issue tracker.
+  - name: Migrating from IsStepVisible to IsSkipped
+    url: https://github.com/jslachta/Honu.Maui.Wizard#wizardstep
+    about: 10.1.0 replaced IsStepVisible with its negation, IsSkipped. The README has the migration table.

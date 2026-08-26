@@ -1,0 +1,78 @@
+name: Bug report
+description: Something in the wizard control behaves differently than documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: `IsStepVisible` was replaced by `IsSkipped` in 10.1.0, and it is a
+        **negation, not a rename** - `IsStepVisible="False"` becomes `IsSkipped="True"`.
+        `CurrentStepIndex` also changed meaning in that release: it indexes `Steps` in full,
+        skipped steps included. If either of those is what you are seeing, the README
+        migration table covers it.
+
+  - type: input
+    id: version
+    attributes:
+      label: Honu.Maui.Wizard version
+      description: The package version, or the commit SHA if you build from source.
+      placeholder: 10.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - Android
+        - iOS
+        - Both
+        - Neither - build, packaging or unit tests
+    validations:
+      required: true
+
+  - type: input
+    id: dotnet
+    attributes:
+      label: .NET SDK and MAUI version
+      description: Output of `dotnet --version` plus the `Microsoft.Maui.Controls` version you reference.
+      placeholder: "10.0.100, Microsoft.Maui.Controls 10.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens
+      description: What you observed, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: |
+        The smallest wizard that shows it - the `WizardStep` markup and whatever binds to it.
+        A step count and which steps are skipped usually matter, so include them.
+      render: xml
+    validations:
+      required: true
+
+  - type: textarea
+    id: viewmodel
+    attributes:
+      label: Relevant C#
+      description: Navigating handler, command, deferral, view model properties - whatever takes part.
+      render: csharp
+
+  - type: checkboxes
+    id: sample
+    attributes:
+      label: Checks
+      options:
+        - label: I looked for an existing issue describing this.
+          required: true
+        - label: I tried it against `samples/Honu.Maui.Wizard.Sample`, which covers skipped steps, async validation and cancelled navigation.
