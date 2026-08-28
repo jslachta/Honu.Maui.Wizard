@@ -17,7 +17,7 @@
 		<PackageTags>maui;wizard;stepper;control;ios;android</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReleaseNotes>
-			10.1.0 - conditional steps are a navigation concern now, not a visibility one: a step is
+			10.1 - conditional steps are a navigation concern now, not a visibility one: a step is
 			stepped over rather than removed, so it keeps its index and the wizard keeps its length.
 			BREAKING. IsStepVisible -&gt; IsSkipped, and this is a NEGATION, not a rename:
 			IsStepVisible="False" becomes IsSkipped="True". StepVisibilityEvaluating,

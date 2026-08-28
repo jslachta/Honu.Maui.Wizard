@@ -148,8 +148,7 @@ builder.UseMauiApp<App>().UseHonuWizard();
 ### `WizardStep`
 
 `ContentView` with `StepId`, `Title` and `IsSkipped`. `IsSkipped` says whether Next and Back pass
-over the step; it is deliberately separate from `VisualElement.IsVisible`, which the wizard owns
-and mutates while switching steps.
+over the step.
 
 `StepId` is a stable identifier that survives reordering and conditional steps - prefer it over
 indexes when reacting to navigation.
@@ -271,14 +270,14 @@ The major version tracks .NET MAUI, not this library's API - `10.x` targets MAUI
 no major version of our own to spend, so **breaking changes land on minor releases** and are
 spelled out here and in the release notes. Pin the minor if that matters to you.
 
-### 10.0.x → 10.1.0
+### 10.0.x → 10.1
 
 Conditional steps stopped being a visibility question and became a navigation one. A step is
 never removed from the wizard; it is stepped over. That makes the flag bindable (nothing moves in
 the visual tree, so no binding context is ever lost) and it keeps every index and the wizard's
 length fixed, which is what a progress indicator needs.
 
-| 10.0.x | 10.1.0 |
+| 10.0.x | 10.1 |
 | --- | --- |
 | `WizardStep.IsStepVisible` | `WizardStep.IsSkipped` — **note the inverted meaning** |
 | `WizardControl.RefreshStepVisibility()` | removed - changing `IsSkipped` is enough |
