@@ -38,6 +38,7 @@
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
+		<IsAotCompatible>True</IsAotCompatible>
 	</PropertyGroup>
 
 	<Import Project="..\..\targets\default.targets" />
