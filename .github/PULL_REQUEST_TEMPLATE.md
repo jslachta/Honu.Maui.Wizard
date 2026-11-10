@@ -33,7 +33,7 @@ table verbatim:
 - [ ] README and XML docs updated if the public API moved
 
 Tests here cover flow bookkeeping - skipping, indexes, navigation, event payloads - on the
-plain `net10.0` target with no emulator. Rendering, animation and layout are out of reach of
+plain `net11.0` target with no emulator. Rendering, animation and layout are out of reach of
 the test host; if that is what this PR touches, say how it was verified by hand and on which
 platform.
 

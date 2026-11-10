@@ -23,7 +23,7 @@ env:
 
 jobs:
   # Only what ships is built here: the sample app is never published and is not part of the
-  # release path. The library targets net10.0 alone and contains no platform-specific code, so
+  # release path. The library targets net11.0 alone and contains no platform-specific code, so
   # no Android or iOS SDK is involved and a Linux host is enough.
   build:
     name: Library and tests
@@ -33,7 +33,7 @@ jobs:
     # install step. If it ever stops matching what the project needs, drop this container and
     # use actions/setup-dotnet plus "dotnet workload restore" on a plain ubuntu-latest instead.
     container:
-      image: ghcr.io/maui-containers/maui-linux:dotnet10.0
+      image: ghcr.io/maui-containers/maui-linux:dotnet11.0
       # The image runs as an unprivileged user, but the runner mounts its work and temp
       # directories into the container with ownership that user cannot write to - actions/checkout
       # fails with EACCES on /__w/_temp before it does anything else. Running as root is the
