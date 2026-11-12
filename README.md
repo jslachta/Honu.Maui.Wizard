@@ -3,7 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Honu.Maui.Wizard.svg)](https://www.nuget.org/packages/Honu.Maui.Wizard/) 
 [![NuGet](https://img.shields.io/nuget/dt/Honu.Maui.Wizard.svg)](https://www.nuget.org/packages/Honu.Maui.Wizard/)
 
-A multi-step wizard control for .NET MAUI (**.NET 10**, iOS + Android). The control is a plain
+A multi-step wizard control for .NET MAUI (**.NET 11**, iOS + Android). The control is a plain
 `View`, so it works identically with and without Shell; the sample in `samples/` runs it as the
 app's Shell root.
 
@@ -15,7 +15,7 @@ Built on top of [Redth's step-by-step wizard walkthrough for .NET MAUI][redth] -
 ## Repository layout
 
 ```
-src/Honu.Maui.Wizard/            the library (net10.0 - see Target framework below)
+src/Honu.Maui.Wizard/            the library (net11.0 - see Target framework below)
     Controls/                    WizardControl, WizardFrame, WizardStep
     Events/                      event args, WizardStepInfo, navigation direction enum
     Hosting/                     MauiAppBuilder integration (UseHonuWizard)
@@ -31,22 +31,22 @@ library keeps one `xmlns` in XAML and one `using` in C#.
 
 ## Build
 
-Requires the .NET 10 SDK with the MAUI workload (`dotnet workload install maui`).
+Requires the .NET 11 SDK with the MAUI workload (`dotnet workload install maui`).
 
 ```bash
 dotnet build Honu.Maui.Wizard.sln
 ```
 
 ```bash
-dotnet build samples/Honu.Maui.Wizard.Sample -f net10.0-android -t:Run
+dotnet build samples/Honu.Maui.Wizard.Sample -f net11.0-android -t:Run
 ```
 
 ## Target framework
 
-The package ships a single `net10.0` assembly, not one per platform. The control contains no
-platform-specific code - no `#if`, no `Platforms/` folder - so `net10.0-android` and
-`net10.0-ios` builds would be byte-for-byte equivalent copies of the same thing, and a
-`net10.0` library is referenced happily from an app targeting any of them.
+The package ships a single `net11.0` assembly, not one per platform. The control contains no
+platform-specific code - no `#if`, no `Platforms/` folder - so `net11.0-android` and
+`net11.0-ios` builds would be byte-for-byte equivalent copies of the same thing, and a
+`net11.0` library is referenced happily from an app targeting any of them.
 
 Add the platform target frameworks back if the library ever grows platform-specific code, such
 as a custom handler. Doing so is additive for consumers.
@@ -57,7 +57,7 @@ as a custom handler. Doing so is additive for consumers.
 dotnet test
 ```
 
-The tests run on the plain `net10.0` target - no emulator, no app host. Two things make that
+The tests run on the plain `net11.0` target - no emulator, no app host. Two things make that
 work: a `DispatcherStub` installed from a module initializer (MAUI needs a dispatcher as soon
 as a bindable property change reaches a binding), and the absence of a layout pass, which keeps
 `Width` at -1 so `WizardFrame` takes its non-animated path. The tests therefore cover the flow
@@ -266,7 +266,7 @@ via `ForwardAsync()`, `BackwardAsync()`, `GoToAsync(int)`, `GetCurrentIndex()`,
 
 ## Versioning
 
-The major version tracks .NET MAUI, not this library's API - `10.x` targets MAUI 10. That leaves
+The major version tracks .NET MAUI, not this library's API - `11.x` targets MAUI 11. That leaves
 no major version of our own to spend, so **breaking changes land on minor releases** and are
 spelled out here and in the release notes. Pin the minor if that matters to you.
 
