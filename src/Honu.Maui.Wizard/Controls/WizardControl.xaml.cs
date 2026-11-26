@@ -363,17 +363,11 @@ public partial class WizardControl : Grid
 
     private void HookStepsNotifier(INotifyCollectionChanged? newNotifier)
     {
-        if (_stepsNotifier is not null)
-        {
-            _stepsNotifier.CollectionChanged -= OnStepsCollectionChanged;
-        }
+        _stepsNotifier?.CollectionChanged -= OnStepsCollectionChanged;
 
         _stepsNotifier = newNotifier;
 
-        if (_stepsNotifier is not null)
-        {
-            _stepsNotifier.CollectionChanged += OnStepsCollectionChanged;
-        }
+        _stepsNotifier?.CollectionChanged += OnStepsCollectionChanged;
     }
 
     private void OnStepsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
